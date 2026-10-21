@@ -3,6 +3,9 @@ var psiTurk = new PsiTurk(uniqueId, adServerLoc, mode);
 var mycondition = condition ;  // these two variables are passed by the psiturk server process
 var mycounterbalance = counterbalance;
 
+// The current simulation contains Berth 1 and Berth 2 only.
+var numberOfBerths = 2;
+
 
 /*var numbers = [0,1,2,3,4,5,6,7,8];
 mycondition = Math.floor(Math.random() * numbers.length);*/
@@ -299,7 +302,7 @@ var DemoQuestionnaire = function() {
 	       psiTurk.recordUnstructuredData(this.id, this.value);
 	     });
 	     
-	     $('input[name=gender]').each( function(i, val) {
+	     $('select[name=gender]').each( function(i, val) {
 			psiTurk.recordUnstructuredData(this.id, this.value);
 		});
 		
@@ -387,14 +390,14 @@ var DemoQuestionnaire = function() {
 	checkenable();
     });
 
-    $("input[name=gender]").change(function(){
+    $("select[name=gender]").change(function(){
 	r3=true;
 	checkenable();
     });
     
     
     $("input[name=prolific_id]").change(function(){
-	r5=true;
+	r5=($(this).val().trim() !== "");
 	checkenable();
     });
 
@@ -588,6 +591,16 @@ var error_message = "<h1>Oops!</h1><p>Something went wrong submitting your infor
 
  psiTurk.showPage('experiment.html');
 
+// The template still contains legacy three-berth controls and video elements.
+// Remove them so the active task can only offer and display Berths 1 and 2.
+$("#id_Berth3, #Berth3, #SA_Berth3, " +
+  "#1block_3drop, #2block_3drop, #3block, #3block_1drop, " +
+  "#3block_2drop, #bag_berth_3").remove();
+
+// Prompt panels must start hidden. The selected communication strategy will
+// reveal only its own panel at the appropriate time.
+$("#id_confrmdiv, #id_block, #id_wh, #id_SA, #id_workload").hide();
+
 // Workload Scale -------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 setInterval (workload, 50000);
@@ -722,8 +735,7 @@ $("#bag_berth_3").hide() ;
 // Silent commm---------------------------------------------------------- // introduce malfunction --evn silent can cause malfunction
 
 var silent_questions = ['I think Berth1 is blocked.',
-                       'I think Berth2 is blocked.',
-                       'I think Berth3 is blocked.'];
+                       'I think Berth2 is blocked.'];
                     
 var ne_silent=0;                  
 
@@ -732,20 +744,12 @@ var random_video;
 
 function silentFunction(){
 
+$("#SA_Berth1, #SA_Berth2").off("click");
+
 
 var randomQuestion_silent = Math.floor(Math.random() * silent_questions.length);
 
-random_video = Math.floor(Math.random()*3);
-var visibleDiv = $('.only_block')[random_video];
-
-var random_video_berth1 = Math.floor(Math.random()*3);
-var visibleDiv_berth1 = $('.Berth1_block')[random_video_berth1];
-
-var random_video_berth2 = Math.floor(Math.random()*3);
-var visibleDiv_berth2 = $('.Berth2_block')[random_video_berth2];
-
-var random_video_berth3 = Math.floor(Math.random()*3);
-var visibleDiv_berth3 = $('.Berth3_block')[random_video_berth3];
+random_video = Math.floor(Math.random()*numberOfBerths);
 
 
 
@@ -1074,6 +1078,8 @@ function sawareness_silent()
 
 
 {
+
+ $("#SA_Berth1, #SA_Berth2").off("click");
   
  setTimeout(function(){   
    if (random_video == 0)
@@ -1217,8 +1223,6 @@ psiTurk.recordTrialData({'phase':'SA_silent',  'status':'SA_Berth3'});
       }, 45000);
   } 
   
-sawareness_silent();
-
 /****************
 * Communication Strategy yes no *
 ****************/ 
@@ -1237,12 +1241,8 @@ $("#bag_berth_2").hide() ;
 $("#bag_berth_3").hide() ;
 
 
-var questions = ['I think Berth 1 is blocked. Can I put the bag on Berth 3?',
-                 'I think Berth 1 is blocked. Can I put the bag on Berth 2?', 
-                 'I think Berth 2 is blocked. Can I put the bag on Berth 1?',
-                 'I think Berth 2 is blocked. Can I put the bag on Berth 3?',
-                 'I think Berth 3 is blocked. Can I put the bag on Berth 1?', 
-                 'I think Berth 3 is blocked. Can I put the bag on Berth 2?'];
+var questions = ['I think Berth 1 is blocked. Can I put the bag on Berth 2?',
+                 'I think Berth 2 is blocked. Can I put the bag on Berth 1?'];
                    
     
 var follow_up = ['Then where do you want me to put it?']; 
@@ -1253,21 +1253,13 @@ var random_video;
  
 function myFunction(){
 
+$("#id_truebtn, #id_falsebtn, #id_Berth1, #id_Berth2").off("click");
+
 var randomQuestion = Math.floor(Math.random() * questions.length);
 
 psiTurk.recordTrialData({'phase':'yn_question', 'status':'question'+questions[randomQuestion]});
 
-var random_video = Math.floor(Math.random()*3);
-var visibleDiv = $('.only_block')[random_video];
-
-var random_video_berth1 = Math.floor(Math.random()*3);
-var visibleDiv_berth1 = $('.Berth1_block')[random_video_berth1];
-
-var random_video_berth2 = Math.floor(Math.random()*3);
-var visibleDiv_berth2 = $('.Berth2_block')[random_video_berth2];
-
-var random_video_berth3 = Math.floor(Math.random()*3);
-var visibleDiv_berth3 = $('.Berth3_block')[random_video_berth3];
+random_video = Math.floor(Math.random()*numberOfBerths);
 
 psiTurk.recordTrialData({'phase':'yn_question', 'status':'question'+questions[randomQuestion]});
 
@@ -2261,11 +2253,6 @@ $("#2block_3drop").hide() ;
 
 };
     
-myFunction();
-
-
-
-
 //SA_yes/no ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 var SA_correct = 0;
@@ -2276,6 +2263,8 @@ var SA_question = ['Which berth is blocked?'];
 
 
 function sawareness(){
+
+$("#SA_Berth1, #SA_Berth2").off("click");
 
 setTimeout(function(){  
     
@@ -2344,7 +2333,7 @@ setTimeout(function(){
     $("#SA_Berth2").hide();
     $("#SA_Berth3").hide();
     
-    SA_correct +=1;
+    SA_incorrect +=1;
 //psiTurk.recordTrialData({'phase':'SA_yes_no', 'status':'SA_correct'+SA_correct});
            psiTurk.recordTrialData({'phase':'SA_yn',  'status':'Berth1'}); 
     }); 
@@ -2356,7 +2345,7 @@ setTimeout(function(){
     $("#SA_Berth2").hide();
     $("#SA_Berth3").hide();
     
-    SA_incorrect +=1;
+    SA_correct +=1;
 //psiTurk.recordTrialData({'phase':'SA_yes_no', 'status':'SA_incorrect'+SA_incorrect});
            psiTurk.recordTrialData({'phase':'SA_yn',  'status':'Berth2'}); 
     });
@@ -2430,35 +2419,24 @@ setTimeout(function(){
    }, 45000);
   } 
   
-sawareness(); 
-    
 /****************
 * Communication Strategy wh *
 ****************/ 
 var SA_question = ['Which berth is blocked?'];
 
 var wh_questions = ['I think Berth1 is blocked. Where you want me to put this bag?',
-                    'I think Berth2 is blocked. Where you want me to put this bag?',
-                    'I think Berth3 is blocked. Where you want me to put this bag?'];
+                    'I think Berth2 is blocked. Where you want me to put this bag?'];
                     
 var ne_wh=0;                  
 var whclear;
 var random_video;   
 function whFunction(){
 
+$("#Berth1, #Berth2").off("click");
+
 var randomQuestion_wh = Math.floor(Math.random() * wh_questions.length);
 
-random_video = Math.floor(Math.random()*3);
-var visibleDiv = $('.only_block')[random_video];
-
-var random_video_berth1 = Math.floor(Math.random()*3);
-var visibleDiv_berth1 = $('.Berth1_block')[random_video_berth1];
-
-var random_video_berth2 = Math.floor(Math.random()*3);
-var visibleDiv_berth2 = $('.Berth2_block')[random_video_berth2];
-
-var random_video_berth3 = Math.floor(Math.random()*3);
-var visibleDiv_berth3 = $('.Berth3_block')[random_video_berth3];
+random_video = Math.floor(Math.random()*numberOfBerths);
 
 psiTurk.recordTrialData({'phase':'wh_question', 'status':'question' +wh_questions[randomQuestion_wh]});
 
@@ -3140,11 +3118,11 @@ $("#2block_3drop").hide() ;
  
 }
 
-whFunction();
-    
 // SA_wh -------------------------------------------------------------------------------------------------------------------------------
 
 function sawareness_wh(){
+
+ $("#SA_Berth1, #SA_Berth2").off("click");
   
  setTimeout(function(){   
    if (random_video == 0)
@@ -3299,8 +3277,6 @@ psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth3'});
       }, 45000);
   } 
   
-sawareness_wh();
-
 if (condition == 0 || condition == 3 || condition == 6 ) {
 
 
@@ -3826,6 +3802,8 @@ if (condition==0)
 
 {
 
+myFunction();
+sawareness();
 setInterval(myFunction,80000);
 clearTimeout(silentclear); 
 clearTimeout(whclear);
@@ -3839,6 +3817,8 @@ if (condition==1)
 
 {
 
+myFunction();
+sawareness();
 setInterval(myFunction,80000);
 clearTimeout(silentclear); 
 clearTimeout(whclear);
@@ -3850,6 +3830,8 @@ if (condition==2)
 
 {
 
+myFunction();
+sawareness();
 setInterval(myFunction,80000);
 clearTimeout(whclear);
 clearTimeout(silentclear); 
@@ -3863,6 +3845,8 @@ if (condition==3)
 
 {
 
+whFunction();
+sawareness_wh();
 clearTimeout(myfunctionclear); 
 setInterval(whFunction,80000);
 clearTimeout(silentclear); 
@@ -3877,6 +3861,8 @@ if (condition==4)
 
 {
 
+whFunction();
+sawareness_wh();
 clearTimeout(myfunctionclear); 
 setInterval(whFunction,80000);
 clearTimeout(silentclear); 
@@ -3889,6 +3875,8 @@ if (condition==5)
 
 {
 
+whFunction();
+sawareness_wh();
 setInterval(whFunction,80000);
 clearTimeout(silentclear); 
 clearTimeout(myfunctionclear); 
@@ -3901,6 +3889,8 @@ if (condition==6)
 
 {
 
+silentFunction();
+sawareness_silent();
 setInterval(silentFunction,80000);
 clearTimeout(myfunctionclear); 
 clearTimeout(whclear);
@@ -3912,6 +3902,8 @@ if (condition==7)
 
 {
 
+silentFunction();
+sawareness_silent();
 setInterval(silentFunction,80000);
 clearTimeout(myfunctionclear); 
 clearTimeout(whclear);
@@ -3924,6 +3916,8 @@ if (condition==8)
 
 {
 
+silentFunction();
+sawareness_silent();
 setInterval(silentFunction,80000);
 clearTimeout(myfunctionclear); 
 clearTimeout(whclear);

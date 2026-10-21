@@ -8,8 +8,25 @@
 
 	  <form id="demographicquestionnaire" action="">
 	    <div class="row question">
-	        <p>Gender (Type 'NA' if you choose not to disclose):
-			<input type="text" name="gender" id="gender" size="50"/></p> <br/>
+	        <p>
+    		    Gender:
+    		    <select name="gender" id="gender" 
+    		    style="width: 220px;
+               	height: 27px;
+               	font-family: inherit;
+               	font-size: inherit;
+               	font-weight: normal;
+              		display: inline-block;
+               	vertical-align: middle;
+               	margin-left: 5px;">
+        		<option value="" disabled selected>Select your gender</option>
+        		<option value="Male">Male</option>
+        		<option value="Female">Female</option>
+        		<option value="Non-binary">Non-binary</option>
+        		<option value="Prefer not to disclose">Prefer not to disclose</option>
+    		    </select>
+		</p>
+		<br/>
 	      <p>Age (Please type using keyboard. Must be 18 or older):
 	      <input type="number" name="age" id="age"/></p>
 						<br/>
@@ -19,36 +36,36 @@
 						
             <p>How much prior experience do you have with robots and artificial intelligence (AI)?:
 							<br/>
-	      			<input type="radio" name="experience1" value="1">1 - I have no prior experience with robots and AI.</input>
+	      			<input type="radio" name="experience1" value="1">1 - I have no prior experience with robots and/or AI.</input>
 							<br/>
-              <input type="radio" name="experience1" value="2">2</input>
+              <input type="radio" name="experience1" value="2">2 - I have very limited knowledge of robotics and/or AI.</input>
 							<br/>
               <input type="radio" name="experience1" value="3">3 - I am interested in robotics and/or AI as a hobby, but have little formal training.</input>
 							<br/>
-              <input type="radio" name="experience1" value="4">4</input>
+              <input type="radio" name="experience1" value="4">4 - I have basic knowledge of robotics and/or AI through self-study or introductory courses.</input>
 							<br/>
-              <input type="radio" name="experience1" value="5">5 - I have some formal training in robotics and/or AI (e.g., university classes).</input>
+              <input type="radio" name="experience1" value="5">5 - I have some formal training in robotics and/or AI (e.g., university courses).</input>
 							<br/>
-              <input type="radio" name="experience1" value="6">6</input>
+              <input type="radio" name="experience1" value="6">6 - I have substantial academic or practical experience in robotics and/or AI.</input>
 							<br/>
-              <input type="radio" name="experience1" value="7">7 - I have a career in robotics and/or AI (or an equivalent level of experience).</input>
+              <input type="radio" name="experience1" value="7">7 - I work professionally in robotics and/or AI or have an equivalent level of expertise.</input>
 						</p>
 						<br/>
 						<p>How much prior experience do you have with Prolific?:<p/>
 						
-	      			<input type="radio" name="experience2" value="1">1 - I have no prior experience with Prolific.</input>
+	      			<input type="radio" name="experience2" value="1">1 - I have never participated in a study through Prolific.</input>
 							<br/>
-              <input type="radio" name="experience2" value="2">2</input>
+              <input type="radio" name="experience2" value="2">2 - I have participated in one or two studies through Prolific.</input>
 							<br/>
-              <input type="radio" name="experience2" value="3">3 - I have little experience with Prolific.</input>
+              <input type="radio" name="experience2" value="3">3 - I have participated in a few studies through Prolific.</input>
 							<br/>
-              <input type="radio" name="experience2" value="4">4</input>
+              <input type="radio" name="experience2" value="4">4 - I have moderate experience participating in studies through Prolific.</input>
 							<br/>
-              <input type="radio" name="experience2" value="5">5 - I have some experience with Prolific.</input>
+              <input type="radio" name="experience2" value="5">5 - I have participated in many studies through Prolific.</input>
 							<br/>
-              <input type="radio" name="experience2" value="6">6</input>
+              <input type="radio" name="experience2" value="6">6 - I have extensive experience participating in studies through Prolific.</input>
 							<br/>
-              <input type="radio" name="experience2" value="7">7 - I have a lot of experience with Prolific. </input>
+              <input type="radio" name="experience2" value="7">7 - I am a highly experienced Prolific participant and regularly participate in research studies.</input>
 						
 						<br/>
 						
