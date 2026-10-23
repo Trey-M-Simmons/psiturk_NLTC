@@ -591,6 +591,10 @@ var error_message = "<h1>Oops!</h1><p>Something went wrong submitting your infor
 
  psiTurk.showPage('experiment.html');
 
+// Communication prompts belong to the number-memory task pane. Moving them
+// inside #msg1 makes the existing task/teammate toggle hide them with that pane.
+$("#id_confrmdiv, #id_block, #id_wh").appendTo("#msg1");
+
 // The template still contains legacy three-berth controls and video elements.
 // Remove them so the active task can only offer and display Berths 1 and 2.
 $("#id_Berth3, #Berth3, #SA_Berth3, " +
@@ -601,119 +605,141 @@ $("#id_Berth3, #Berth3, #SA_Berth3, " +
 // reveal only its own panel at the appropriate time.
 $("#id_confrmdiv, #id_block, #id_wh, #id_SA, #id_workload").hide();
 
+function setSituationAwarenessScreenActive(isActive) {
+    $("body").toggleClass("sa-active", isActive);
+    $("#id_SA").toggle(isActive);
+}
+
+// Existing response handlers record rewards and start the appropriate videos.
+// This delegated handler runs afterward and guarantees that the answered panel
+// is dismissed in every question/video branch.
+$(document).on(
+    "click.communicationPromptCleanup",
+    "#id_truebtn, #id_falsebtn, #id_Berth1, #id_Berth2, #Berth1, #Berth2, #SA_Berth1, #SA_Berth2",
+    function () {
+        if (this.id === "SA_Berth1" || this.id === "SA_Berth2") {
+            setSituationAwarenessScreenActive(false);
+            $("#SA_Berth1, #SA_Berth2").hide();
+            return;
+        }
+
+        if (this.id === "id_truebtn" || this.id === "id_falsebtn") {
+            $("#id_confrmdiv, #id_truebtn, #id_falsebtn").hide();
+            return;
+        }
+
+        if (this.id === "id_Berth1" || this.id === "id_Berth2") {
+            $("#id_block, #id_Berth1, #id_Berth2").hide();
+            return;
+        }
+
+        $("#id_wh, #Berth1, #Berth2").hide();
+    }
+);
+
+// Workload and situation-awareness questions run on independent timers. When
+// both overlays have expired, explicitly restore the task pane and synchronize
+// the task/teammate toggle so unanswered questions cannot trap the participant
+// in an overlay-to-overlay loop.
+function restoreTaskPaneWhenQuestionsClear() {
+    if ($("#id_workload").is(":visible") || $("#id_SA").is(":visible")) {
+        return;
+    }
+
+    $(".hidemsg").hide();
+    $("#msg1").show();
+    $(".js-button").text("View Teammate");
+
+    if (typeof index !== "undefined") {
+        index = 2;
+    }
+}
+
 // Workload Scale -------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-setInterval (workload, 50000);
+setInterval(workload, 50000);
 
-var question = ['Rate your workload on a scale of 1-5'];
-                
-workload_one=0;
-workload_two=0;
-workload_three=0;
-workload_four=0;
-workload_five=0;
+var question = ['Rate your workload on a scale of 1-3'];
 
-function workload()
-{
+workload_one = 0;
+workload_two = 0;
+workload_three = 0;
+var workloadPromptActive = false;
 
+// While the workload question is open, prevent the number-memory task from
+// receiving key presses. Key presses on the workload buttons are still allowed.
+$(document).on("keypress.workloadLock", function (event) {
+    if (!workloadPromptActive) {
+        return;
+    }
 
-$("#question").html(question);
-
-
-$("#id_workload").hide(); 
-
-
-setTimeout(function (){ 
-$("#id_workload").show();
-//$("#question").show(); 
-$("#id_one").show(); 
-$("#id_two").show(); 
-$("#id_three").show(); 
-$("#id_four").show(); 
-$("#id_five").show(); 
-
-
-
-$("#id_one").click(function(){
-
-psiTurk.recordTrialData({'phase':'Workload', 'status':'workload_one'});
-
-$("#id_workload").hide();
-$("#question").hide();  
-$("#id_one").hide(); 
-$("#id_two").hide(); 
-$("#id_three").hide(); 
-$("#id_four").hide(); 
-$("#id_five").hide(); 
-
-
-
+    event.stopImmediatePropagation();
+    if ($(event.target).closest("#id_workload").length === 0) {
+        event.preventDefault();
+    }
 });
 
-$("#id_two").click(function(){
-psiTurk.recordTrialData({'phase':'Workload', 'status':'workload_two'});
-$("#id_workload").hide();
-$("#question").hide();  
-$("#id_one").hide(); 
-$("#id_two").hide(); 
-$("#id_three").hide(); 
-$("#id_four").hide(); 
-$("#id_five").hide(); 
-
-
-
-
-});
-
-$("#id_three").click(function(){
-
-psiTurk.recordTrialData({'phase':'Workload', 'status':'workload_three'});
-$("#question").hide(); 
-$("#id_workload").hide(); 
-$("#id_one").hide(); 
-$("#id_two").hide(); 
-$("#id_three").hide(); 
-$("#id_four").hide(); 
-$("#id_five").hide(); 
-
-
-
-
-});
-
-$("#id_four").click(function(){
-
-psiTurk.recordTrialData({'phase':'Workload', 'status':'workload_four'});
-$("#question").hide(); 
-$("#id_workload").hide(); 
-$("#id_one").hide(); 
-$("#id_two").hide(); 
-$("#id_three").hide(); 
-$("#id_four").hide(); 
-$("#id_five").hide(); 
-
-
-
-
-});
-
-
-$("#id_five").click(function(){
-psiTurk.recordTrialData({'phase':'Workload', 'status':'workload_five'});
-$("#question").hide(); 
-$("#id_workload").hide(); 
-$("#id_one").hide(); 
-$("#id_two").hide(); 
-$("#id_three").hide(); 
-$("#id_four").hide(); 
-$("#id_five").hide(); 
- 
-});
-
-
-},25000);
-
+function setWorkloadScreenActive(isActive) {
+    workloadPromptActive = isActive;
+    $("body").toggleClass("workload-active", isActive);
+    $(".js-button").prop("disabled", isActive);
+    $("#msg1, #msg2, #experiment-controls")
+        .prop("inert", isActive)
+        .attr("aria-hidden", isActive ? "true" : null);
 }
+
+function workload() {
+    // Preserve the original timed progression: an unanswered workload prompt
+    // expires when the next cycle starts. Release its interaction lock before
+    // hiding it so communication buttons cannot be left inert.
+    if (workloadPromptActive) {
+        setWorkloadScreenActive(false);
+    }
+
+    $("#question").html(question);
+    $("#id_workload").hide();
+    restoreTaskPaneWhenQuestionsClear();
+
+    setTimeout(function () {
+        setWorkloadScreenActive(true);
+        $("#id_workload").show();
+        $("#id_one").show();
+        $("#id_two").show();
+        $("#id_three").show();
+        $("#id_one").trigger("focus");
+
+        $("#id_one").click(function () {
+            psiTurk.recordTrialData({'phase': 'Workload', 'status': 'workload_one'});
+            $("#id_workload").hide();
+            setWorkloadScreenActive(false);
+            $("#question").hide();
+            $("#id_one").hide();
+            $("#id_two").hide();
+            $("#id_three").hide();
+        });
+
+        $("#id_two").click(function () {
+            psiTurk.recordTrialData({'phase': 'Workload', 'status': 'workload_two'});
+            $("#id_workload").hide();
+            setWorkloadScreenActive(false);
+            $("#question").hide();
+            $("#id_one").hide();
+            $("#id_two").hide();
+            $("#id_three").hide();
+        });
+
+        $("#id_three").click(function () {
+            psiTurk.recordTrialData({'phase': 'Workload', 'status': 'workload_three'});
+            $("#id_workload").hide();
+            setWorkloadScreenActive(false);
+            $("#question").hide();
+            $("#id_one").hide();
+            $("#id_two").hide();
+            $("#id_three").hide();
+        });
+    }, 25000);
+}
+
 workload();
 //--------------------------------------------------------------------------------------------------------------------
 
@@ -743,8 +769,6 @@ var silentclear;
 var random_video;
 
 function silentFunction(){
-
-$("#SA_Berth1, #SA_Berth2").off("click");
 
 
 var randomQuestion_silent = Math.floor(Math.random() * silent_questions.length);
@@ -1078,7 +1102,9 @@ function sawareness_silent()
 
 
 {
-
+ $("#id_SA, #SA_Berth1, #SA_Berth2").hide();
+ setSituationAwarenessScreenActive(false);
+ restoreTaskPaneWhenQuestionsClear();
  $("#SA_Berth1, #SA_Berth2").off("click");
   
  setTimeout(function(){   
@@ -1086,7 +1112,7 @@ function sawareness_silent()
     {
     psiTurk.recordTrialData({'phase':'SA_silent_question', 'status':'I think Berth1 is blocked.'});
     
-    $("#id_SA").show();
+    setSituationAwarenessScreenActive(true);
     $("#SA_Berth1").show();
     $("#SA_Berth2").show();
     $("#SA_Berth3").show();
@@ -1133,7 +1159,7 @@ psiTurk.recordTrialData({'phase':'SA_silent',  'status':'SA_Berth3'});
     if (random_video == 1)
     {
     psiTurk.recordTrialData({'phase':'SA_silent_question', 'status':'I think Berth2 is blocked.'});
-    $("#id_SA").show();
+    setSituationAwarenessScreenActive(true);
     $("#SA_Berth1").show();
     $("#SA_Berth2").show();
     $("#SA_Berth3").show();
@@ -1179,7 +1205,7 @@ psiTurk.recordTrialData({'phase':'SA_silent', 'status':'SA_Berth3'});
      if (random_video == 2)
     {
     psiTurk.recordTrialData({'phase':'SA_silent_question', 'status':'I think Berth3 is blocked.'});
-    $("#id_SA").show();
+    setSituationAwarenessScreenActive(true);
     $("#SA_Berth1").show();
     $("#SA_Berth2").show();
     $("#SA_Berth3").show();
@@ -2264,6 +2290,9 @@ var SA_question = ['Which berth is blocked?'];
 
 function sawareness(){
 
+$("#id_SA, #SA_Berth1, #SA_Berth2").hide();
+setSituationAwarenessScreenActive(false);
+restoreTaskPaneWhenQuestionsClear();
 $("#SA_Berth1, #SA_Berth2").off("click");
 
 setTimeout(function(){  
@@ -2271,7 +2300,7 @@ setTimeout(function(){
    if (random_video == 0)
     {
     psiTurk.recordTrialData({'phase':'SA_yn_block',  'status':'Berth1 is blocked'}); 
-    $("#id_SA").show();
+    setSituationAwarenessScreenActive(true);
     $("#SA_Berth1").show();
     $("#SA_Berth2").show();
     $("#SA_Berth3").show();
@@ -2320,7 +2349,7 @@ setTimeout(function(){
    if (random_video == 1)
     {
         psiTurk.recordTrialData({'phase':'SA_yn_block',  'status':'Berth2 is blocked'}); 
- $("#id_SA").show();
+ setSituationAwarenessScreenActive(true);
     $("#SA_Berth1").show();
     $("#SA_Berth2").show();
     $("#SA_Berth3").show();
@@ -2369,7 +2398,7 @@ setTimeout(function(){
     if (random_video == 2)
     {
         psiTurk.recordTrialData({'phase':'SA_yn_block',  'status':'Berth3 is blocked'}); 
-    $("#id_SA").show();
+    setSituationAwarenessScreenActive(true);
     $("#SA_Berth1").show();
     $("#SA_Berth2").show();
     $("#SA_Berth3").show();
@@ -2602,7 +2631,7 @@ $("#3block_2drop").hide() ;
     
         $("#Berth2").click(function() {
            
-               $("#id_block").hide();
+               $("#id_wh").hide();
                $("#Berth1").hide();$("#2block").hide();
                $("#Berth2").hide();  
                 $("#Berth3").hide();
@@ -3122,13 +3151,16 @@ $("#2block_3drop").hide() ;
 
 function sawareness_wh(){
 
+ $("#id_SA, #SA_Berth1, #SA_Berth2").hide();
+ setSituationAwarenessScreenActive(false);
+ restoreTaskPaneWhenQuestionsClear();
  $("#SA_Berth1, #SA_Berth2").off("click");
   
  setTimeout(function(){   
    if (random_video == 0)
     {
     psiTurk.recordTrialData({'phase':'SA_wh_block',  'status':'Berth1 is blocked'});
-    $("#id_SA").show();
+    setSituationAwarenessScreenActive(true);
     $("#SA_Berth1").show();
     $("#SA_Berth2").show();
     $("#SA_Berth3").show();
@@ -3178,7 +3210,7 @@ psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth3'});
     if (random_video == 1)
     {
     psiTurk.recordTrialData({'phase':'SA_wh_block',  'status':'Berth2 is blocked'});
-    $("#id_SA").show();
+    setSituationAwarenessScreenActive(true);
     $("#SA_Berth1").show();
     $("#SA_Berth2").show();
     $("#SA_Berth3").show();
@@ -3229,7 +3261,7 @@ psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth3'});
      if (random_video == 2)
     {
     psiTurk.recordTrialData({'phase':'SA_wh_block',  'status':'Berth3 is blocked.'});
-    $("#id_SA").show();
+    setSituationAwarenessScreenActive(true);
     $("#SA_Berth1").show();
     $("#SA_Berth2").show();
     $("#SA_Berth3").show();

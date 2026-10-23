@@ -118,6 +118,13 @@
 
 
 
+<div id="experiment-controls">
+<div id="countdown"></div>
+<button type="button" class="btn btn-default js-button">View Task</button>
+</div>
+
+
+
 <script>
 
 
@@ -150,14 +157,6 @@ function toggler() {
 </script>
 
 
-<a href="#" type="button" class="btn btn-default js-button" style = "font-size: 1.5vw; float: right; border: 2px solid black;">View Task</a> 
-
-<div id="countdown" style= "font-size: 2vw; float: right; margin-left:80%; " ></div> 
-
-
-
-
-
 <div id="id_confrmdiv"  >
 
 <div id = "random" > </div>
@@ -188,11 +187,9 @@ function toggler() {
 
 <h1> Which berth is blocked? </h1>
 
-<a href="#" type="button" id="SA_Berth1" style = "border: 2px solid black;">Berth1</a>
+<button type="button" id="SA_Berth1">Berth1</button>
 
-<a href="#" type="button" id="SA_Berth2" style = "border: 2px solid black;">Berth2</a>
-
-<a href="#" type="button" id="SA_Berth3" style = "border: 2px solid black;">Berth3</a>
+<button type="button" id="SA_Berth2">Berth2</button>
 
 </div>
 
@@ -204,29 +201,21 @@ function toggler() {
 <button id="Berth1">Berth1</button>
 <button id="Berth2">Berth2</button>
 <button id="Berth3">Berth3</button>
-</div--->
 </div>
 
 
 
-<div id="id_workload" class="overlay">
+<div id="id_workload" class="overlay" role="dialog" aria-modal="true" aria-labelledby="workload-heading">
+    <div class="workload-dialog">
+        <h1 id="workload-heading">Rate your workload on a scale of 1&ndash;3</h1>
+        <p class="workload-instruction">1 = Low &nbsp;&bull;&nbsp; 2 = Medium &nbsp;&bull;&nbsp; 3 = High</p>
 
-<!--div id = "question" style= "font-size: 3.5vw;" > </div--->
-
-<h1> Rate your workload on a scale of 1 - 5 </h1>
-<h4> Low ----------> High </h4>
-
-
-<a href="#" type="button" id="id_one"  style = "border: 2px solid black;" >1</a>
-
-<a href="#" type="button" id="id_two" style = "border: 2px solid black;">2</a>
-
-<a href="#" type="button" id="id_three" style = "border: 2px solid black;">3</a>
-
-<a href="#" type="button" id="id_four"  style = "border: 2px solid black;">4</a>
-
-<a href="#" type="button" id="id_five" style = "border: 2px solid black;">5</a>
-
+        <div class="workload-scale-options" role="group" aria-label="Workload level">
+            <button type="button" id="id_one" class="workload-option" aria-label="1, low workload">1</button>
+            <button type="button" id="id_two" class="workload-option" aria-label="2, medium workload">2</button>
+            <button type="button" id="id_three" class="workload-option" aria-label="3, high workload">3</button>
+        </div>
+    </div>
 </div>
 
 
