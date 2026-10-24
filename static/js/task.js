@@ -1285,7 +1285,20 @@ var randomQuestion = Math.floor(Math.random() * questions.length);
 
 psiTurk.recordTrialData({'phase':'yn_question', 'status':'question'+questions[randomQuestion]});
 
-random_video = Math.floor(Math.random()*numberOfBerths);
+// random_video = Math.floor(Math.random()*numberOfBerths);
+// make the robot's assessment correct with 70% probability.
+var robotCorrect = Math.random() < 0.70;
+if (robotCorrect) {
+    random_video = randomQuestion;
+} else {
+    random_video = 1 - randomQuestion;
+}
+
+// record whether the robot's initial assessment was correct.
+psiTurk.recordTrialData({
+    'phase': 'robot_accuracy',
+    'status': robotCorrect ? 'correct' : 'incorrect'
+});
 
 psiTurk.recordTrialData({'phase':'yn_question', 'status':'question'+questions[randomQuestion]});
 
@@ -2465,7 +2478,23 @@ $("#Berth1, #Berth2").off("click");
 
 var randomQuestion_wh = Math.floor(Math.random() * wh_questions.length);
 
-random_video = Math.floor(Math.random()*numberOfBerths);
+// Make the robot's assessment correct with 70% probability.
+var robotCorrect_wh = Math.random() < 0.70;
+
+// For this two-berth experiment:
+// question 0 claims Berth 1 is blocked.
+// question 1 claims Berth 2 is blocked.
+if (robotCorrect_wh) {
+    random_video = randomQuestion_wh;
+} else {
+    random_video = 1 - randomQuestion_wh;
+}
+
+// Record the intended accuracy outcome.
+psiTurk.recordTrialData({
+    'phase': 'robot_accuracy_wh',
+    'status': robotCorrect_wh ? 'correct' : 'incorrect'
+});
 
 psiTurk.recordTrialData({'phase':'wh_question', 'status':'question' +wh_questions[randomQuestion_wh]});
 
