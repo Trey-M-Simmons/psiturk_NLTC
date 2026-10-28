@@ -4,6 +4,8 @@ from flask import Blueprint, render_template, request, jsonify, Response, abort,
 from jinja2 import TemplateNotFound
 from functools import wraps
 from sqlalchemy import or_
+from pathlib import Path
+import sys
 
 from psiturk.psiturk_config import PsiturkConfig
 from psiturk.experiment_errors import ExperimentError, InvalidUsageError
@@ -41,6 +43,35 @@ def my_custom_view():
         return render_template('custom.html')
     except TemplateNotFound:
         abort(404)
+
+##### Natural Language to Command (NLTC) #####
+
+#imports
+#this adds the main folder to the sys path and allows the import of NLTC
+NLTC_Direct = Path(__file__).resolve().parent
+print(str(NLTC_Direct))
+sys.path.append(str(NLTC_Direct / "NaturalLanguageToRobotCommands"))
+import NaturalLangToCommand as NLTC
+
+
+#custom endpoint
+@custom_code.route('/natural_lang_to_command', methods=['POST'])
+def natural_lang_to_command():
+    reqDict = request.get_json()
+    userCommand = reqDict.get("userCommand", -1)
+
+    #check for blank prompts or posts without userCommand key 
+    if(userCommand == -1):
+        response = {"error": "no userCommand Given"}
+        return jsonify(response)
+    if(userCommand == ""):
+        response = {"error": "blank prompt"}
+        return jsonify(response)
+
+    LLM_Resp = NLTC.toCommand(userCommand)
+
+    return Response(LLM_Resp, mimetype="application/json")
+    
 
 # ----------------------------------------------
 # example using HTTP authentication

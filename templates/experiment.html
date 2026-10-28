@@ -39,7 +39,43 @@
 <div id="presenter_two" class="center-screen" style="font-size: 3vw;"> </div>
 
 
+<!---Natural Language to Command--->
+<div id="nltc-panel" style="position:fixed; left:0; right:0; bottom:0; z-index:1; background:#fff; border-top:1px solid #aaa; padding:8px; text-align:center;">
+  <form id="nltc-form" style="text-align:center; margin:0;">
+    <input type="text" id="nltc-input" placeholder="Type a command for your teammate" autocomplete="off" style="width:60%;">
+    <button type="submit" id="nltc-send">Send</button>
+  </form>
+  <div id="nltc-response" style="text-align:center; min-height:1.5em;"></div>
+</div>
 
+<script>
+  document.getElementById('nltc-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const input = document.getElementById('nltc-input');
+    const out = document.getElementById('nltc-response');
+    const userCommand = input.value.trim();
+    if (!userCommand) return;
+
+    try {
+      const res = await fetch('/natural_lang_to_command', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({"userCommand": userCommand})
+      });
+      if (!res.ok) {
+        out.textContent = 'Server error (' + res.status + ').';
+        return;
+      }
+      const data = await res.json();
+      out.textContent = data.error ? data.error : JSON.stringify(data);
+      input.value = '';
+    } catch (err) {
+      console.error(err);
+      out.textContent = 'Request failed: ' + err.message;
+    }
+  });
+</script>
+<!---NLTC end--->
 
 
 </div>
@@ -140,9 +176,9 @@ function toggler() {
     $('.hidemsg').hide();   
     $('#msg' + index).show();
 
-      if (button.innerText === "View Task") { 
+  if (button.innerText === "View Task") { 
 
-      button.innerText = "View Teammate"; 
+    button.innerText = "View Teammate"; 
     
   }   
   else {  
