@@ -49,7 +49,6 @@ def my_custom_view():
 #imports
 #this adds the main folder to the sys path and allows the import of NLTC
 NLTC_Direct = Path(__file__).resolve().parent
-print(str(NLTC_Direct))
 sys.path.append(str(NLTC_Direct / "NaturalLanguageToRobotCommands"))
 import NaturalLangToCommand as NLTC
 
@@ -72,6 +71,26 @@ def natural_lang_to_command():
 
     return Response(LLM_Resp, mimetype="application/json")
     
+
+# Debug helper: when the page is opened with ?condition=N, store that N in the
+# participant's `cond` column so the database matches what was actually run.
+@custom_code.route('/set_condition', methods=['POST'])
+def set_condition():
+    data = request.get_json() or {}
+    uniqueId = data.get('uniqueId')
+    try:
+        cond = int(data.get('condition'))
+    except (TypeError, ValueError):
+        abort(400)
+    try:
+        user = Participant.query.filter(Participant.uniqueid == uniqueId).one()
+    except Exception:
+        abort(404)
+    user.cond = cond
+    db_session.add(user)
+    db_session.commit()
+    return jsonify({"cond": cond})
+
 
 # ----------------------------------------------
 # example using HTTP authentication

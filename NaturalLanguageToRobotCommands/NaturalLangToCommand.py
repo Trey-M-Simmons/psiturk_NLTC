@@ -15,13 +15,13 @@ openAIModel:str = "gpt-5.6-luna"
 purdueModel:str =  "gpt-oss:120b"
 
 preamble: str = f"""The body of the prompt is from a user attempting to send a command to a robot using natural language.
-                    I need you to decern what command that this would translate to and return the answer in the 
-                    specified json format, do NOT send anything but the command in the specified json format. If you are 
-                    unable to determine the command, return an error in the specified json format.
+                    The robots commands are limited to placing items in specific berths. Berth 1 is green and on the left 
+                    while berth 2 is blue and on the right. I need you to decern what command that this would translate to
+                    and return the answer in the specified json format, do NOT send anything but the command in the specified
+                     json format. If you are unable to determine the command, return an error in the specified json format.
                     Commands:
                     {{"command":"place","location":"berth1"}}
                     {{"command":"place","location":"berth2"}}
-                    {{"command":"place","location":"berth3"}}
                     Error Format:
                     {{"error":"unable to determine command"}}"""
                     

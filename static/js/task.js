@@ -10,6 +10,27 @@ var numberOfBerths = 2;
 /*var numbers = [0,1,2,3,4,5,6,7,8];
 mycondition = Math.floor(Math.random() * numbers.length);*/
 
+// In debug runs, prefer an explicit URL condition override when provided.
+var conditionFromUrl = parseInt(new URLSearchParams(window.location.search).get('condition'), 10);
+if (!isNaN(conditionFromUrl)) {
+    mycondition = conditionFromUrl;
+    // The server picked its own cond when assigning the participant; overwrite it.
+    // The datastring's `condition` key comes from this model, loaded before the override.
+    psiTurk.taskdata.set('condition', conditionFromUrl);
+    $.ajax({url: '/set_condition', type: 'POST', contentType: 'application/json',
+            data: JSON.stringify({uniqueId: uniqueId, condition: conditionFromUrl})});
+}
+
+// 12 conditions: 0-8 are the original 3x3 design (n-back level x yes/no, wh
+// buttons, silent). Conditions 9-11 are the wh question answered through a
+// free-text box; they use the wh flow of conditions 3-5 with the same n-back level.
+mycondition = mycondition % 12;
+var recordedCondition = mycondition; // true 0-11 condition, for the data
+var useTextBox = mycondition >= 9;
+if (useTextBox) {
+    mycondition -= 6;
+}
+
 
 if (mycondition%9 == 0)
 {  condition = 0; 
@@ -43,24 +64,24 @@ else if (mycondition%9 == 4)
         }       
 
 else if (mycondition%9 == 5)
-        { condition == 5;
+        { condition = 5;
         
 //psiTurk.recordTrialData({'phase':'condition', 'status':'5'});        
         }
            
 else if (mycondition%9 == 6)
-        { condition == 6;
+        { condition = 6;
         
 //psiTurk.recordTrialData({'phase':'condition', 'status':'6'});        
         }          
 
 else if (mycondition%9 == 7)
-        { condition == 7;
+        { condition = 7;
 //psiTurk.recordTrialData({'phase':'condition', 'status':'7'});        
         }
 
-else (mycondition%9 == 8)
-        { condition == 8;
+else if (mycondition%9 == 8)
+        { condition = 8;
 //psiTurk.recordTrialData({'phase':'condition', 'status':'8'});        
         }
 
@@ -91,6 +112,8 @@ var pages = [
     
     
 const init = (async () => {
+    // Avoid serving stale cached page templates
+    $.ajaxSetup({cache: false});
     await psiTurk.preloadPages(pages);
 })()
 
@@ -343,7 +366,7 @@ var DemoQuestionnaire = function() {
    
     psiTurk.showPage('demographics.html');
 
- psiTurk.recordTrialData({'phase':'condition', 'status':'condition' + condition})   
+ psiTurk.recordTrialData({'phase':'condition', 'status':'condition' + recordedCondition})   
 
     psiTurk.recordTrialData({'phase':'demoquestionnaire', 'status':'begin'});
 
@@ -657,7 +680,22 @@ function restoreTaskPaneWhenQuestionsClear() {
 
 // Workload Scale -------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-setInterval(workload, 50000);
+// Every game timer is registered here so endGameCleanup can stop them when the
+// game ends; otherwise the workload/SA prompts keep blocking the questionnaire.
+var gameTimers = [];
+function trackInterval(fn, ms) { var id = setInterval(fn, ms); gameTimers.push({id: id, interval: true}); return id; }
+function trackTimeout(fn, ms) { var id = setTimeout(fn, ms); gameTimers.push({id: id, interval: false}); return id; }
+
+function endGameCleanup() {
+    gameTimers.forEach(function (t) { t.interval ? clearInterval(t.id) : clearTimeout(t.id); });
+    gameTimers = [];
+    setWorkloadScreenActive(false);
+    setSituationAwarenessScreenActive(false);
+    $(document).off("keypress.workloadLock keypress.textboxLock keypress.game");
+    $("#id_confrmdiv, #id_block, #id_wh, #id_SA, #id_workload").hide();
+}
+
+trackInterval(workload, 50000);
 
 var question = ['Rate your workload on a scale of 1-3'];
 
@@ -676,6 +714,15 @@ $(document).on("keypress.workloadLock", function (event) {
     event.stopImmediatePropagation();
     if ($(event.target).closest("#id_workload").length === 0) {
         event.preventDefault();
+    }
+});
+
+// Keys typed into the command text box must not reach the memory game.
+// Keyed on the event target, so the game resumes as soon as the box loses
+// focus or its prompt is hidden. Registered before the game's handlers.
+$(document).on("keypress.textboxLock", function (event) {
+    if ($(event.target).is("#wh_input")) {
+        event.stopImmediatePropagation();
     }
 });
 
@@ -700,7 +747,7 @@ function workload() {
     $("#id_workload").hide();
     restoreTaskPaneWhenQuestionsClear();
 
-    setTimeout(function () {
+    trackTimeout(function () {
         setWorkloadScreenActive(true);
         $("#id_workload").show();
         $("#id_one").show();
@@ -773,7 +820,8 @@ function silentFunction(){
 
 var randomQuestion_silent = Math.floor(Math.random() * silent_questions.length);
 
-random_video = Math.floor(Math.random()*numberOfBerths);
+// The question index is the berth the robot claims is blocked, so the video must match it.
+random_video = randomQuestion_silent;
 
 
 
@@ -834,7 +882,7 @@ $("#bag_berth_3").hide(); console.log("video2");
 }}
 ne_silent = silent_questions[randomQuestion_silent];
 //$("#random_silent").html(wh_questions[randomQuestion_wh]);
-silentclear = setTimeout ( function () {
+silentclear = trackTimeout( function () {
 
 
 psiTurk.recordTrialData({'phase':'SA_silent_question', 'status':silent_questions[randomQuestion_silent]});
@@ -1107,7 +1155,7 @@ function sawareness_silent()
  restoreTaskPaneWhenQuestionsClear();
  $("#SA_Berth1, #SA_Berth2").off("click");
   
- setTimeout(function(){   
+ trackTimeout(function(){   
    if (random_video == 0)
     {
     psiTurk.recordTrialData({'phase':'SA_silent_question', 'status':'I think Berth1 is blocked.'});
@@ -1285,8 +1333,10 @@ var randomQuestion = Math.floor(Math.random() * questions.length);
 
 psiTurk.recordTrialData({'phase':'yn_question', 'status':'question'+questions[randomQuestion]});
 
-// random_video = Math.floor(Math.random()*numberOfBerths);
-// make the robot's assessment correct with 70% probability.
+// The question index is the berth the robot claims is blocked, so the video must match it.
+random_video = randomQuestion;
+//make the robot's assessment correct with 70% probability.
+/*
 var robotCorrect = Math.random() < 0.70;
 if (robotCorrect) {
     random_video = randomQuestion;
@@ -1298,7 +1348,7 @@ if (robotCorrect) {
 psiTurk.recordTrialData({
     'phase': 'robot_accuracy',
     'status': robotCorrect ? 'correct' : 'incorrect'
-});
+});*/
 
 psiTurk.recordTrialData({'phase':'yn_question', 'status':'question'+questions[randomQuestion]});
 
@@ -1366,7 +1416,7 @@ $("#id_confrmdiv").hide();
 $("#id_block").hide();
 
 
-myfunctionclear=setTimeout(function () {
+myfunctionclear=trackTimeout(function () {
 
 $("#id_confrmdiv").show();
 $("#id_truebtn").show();
@@ -2308,7 +2358,7 @@ setSituationAwarenessScreenActive(false);
 restoreTaskPaneWhenQuestionsClear();
 $("#SA_Berth1, #SA_Berth2").off("click");
 
-setTimeout(function(){  
+trackTimeout(function(){  
     
    if (random_video == 0)
     {
@@ -2466,18 +2516,55 @@ setTimeout(function(){
 ****************/ 
 var SA_question = ['Which berth is blocked?'];
 
-var wh_questions = ['I think Berth1 is blocked. Where you want me to put this bag?',
-                    'I think Berth2 is blocked. Where you want me to put this bag?'];
+var wh_questions = ['I think Berth1 is blocked. Where do you want me to put this bag?',
+                    'I think Berth2 is blocked. Where do you want me to put this bag?'];
                     
 var ne_wh=0;                  
 var whclear;
 var random_video;   
+
+// Free-text answer for the wh question: the NLTC endpoint converts it to a
+// berth command, which triggers the same handler the berth buttons used to.
+$(document).on('submit', '#wh_form', async function (e) {
+    e.preventDefault();
+    var text = $("#wh_input").val().trim();
+    if (!text) return;
+    var $send = $("#wh_send").prop('disabled', true);
+    $("#wh_error").text('');
+    $("#wh_response").text('');
+    try {
+        var res = await fetch('/natural_lang_to_command', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({"userCommand": text})
+        });
+        var data = await res.json();
+        //$("#wh_response").text('API response: ' + JSON.stringify(data));//DEBUG
+        var match = data && data.command === 'place' && /^berth([123])$/i.exec(String(data.location || ''));
+        if (match) {
+            psiTurk.recordTrialData({'phase':'wh_user_text', 'status':text});
+            $("#wh_input").val('');
+            $("#Berth" + match[1]).trigger('click');
+        } else {
+            $("#wh_error").text("Sorry, I couldn't understand. Please say which berth to put the bag on.");
+        }
+    } catch (err) {
+        console.error(err);
+        $("#wh_error").text('Request failed. Please try again.');
+    } finally {
+        $send.prop('disabled', false);
+    }
+});
 function whFunction(){
 
 $("#Berth1, #Berth2").off("click");
-
+//robot being correct 100% of the time is reinstated
 var randomQuestion_wh = Math.floor(Math.random() * wh_questions.length);
+// The question index is the berth the robot claims is blocked, so the video must match it.
+random_video = randomQuestion_wh;
+psiTurk.recordTrialData({'phase':'wh_question', 'status':'question' +wh_questions[randomQuestion_wh]});
 
+/*
 // Make the robot's assessment correct with 70% probability.
 var robotCorrect_wh = Math.random() < 0.70;
 
@@ -2496,10 +2583,11 @@ psiTurk.recordTrialData({
     'status': robotCorrect_wh ? 'correct' : 'incorrect'
 });
 
-psiTurk.recordTrialData({'phase':'wh_question', 'status':'question' +wh_questions[randomQuestion_wh]});
+psiTurk.recordTrialData({'phase':'wh_question', 'status':'question' +wh_questions[randomQuestion_wh]});*/
+psiTurk.recordTrialData({'phase':'wh_input_mode', 'status': useTextBox ? 'text' : 'buttons'});
 
 
-if ((wh_questions[randomQuestion_wh] == 'I think Berth1 is blocked. Where you want me to put this bag?')|| (wh_questions[randomQuestion_wh] == 'I think Berth2 is blocked. Where you want me to put this bag?') || (wh_questions[randomQuestion_wh] == 'I think Berth3 is blocked. Where you want me to put this bag?') )
+if ((wh_questions[randomQuestion_wh] == 'I think Berth1 is blocked. Where do you want me to put this bag?')|| (wh_questions[randomQuestion_wh] == 'I think Berth2 is blocked. Where do you want me to put this bag?') || (wh_questions[randomQuestion_wh] == 'I think Berth3 is blocked. Where you want me to put this bag?') )
 {
 
 if (random_video == 0) {
@@ -2560,10 +2648,15 @@ $("#random_wh").html(wh_questions[randomQuestion_wh]);
 
     
 $("#id_wh").hide(); 
+$("#wh_input").val('');
+$("#wh_error").text('');
+$("#wh_response").text('');
+$("#wh_textbox").toggle(useTextBox);
+$("#wh_buttons").toggle(!useTextBox);
 
-whclear=setTimeout(function () {
+whclear=trackTimeout(function () {
 
-if ( wh_questions[randomQuestion_wh] == 'I think Berth1 is blocked. Where you want me to put this bag?') {
+if ( wh_questions[randomQuestion_wh] == 'I think Berth1 is blocked. Where do you want me to put this bag?') {
 
  
           $("#id_wh").show();
@@ -2772,7 +2865,7 @@ $("#2block_3drop").hide() ;
 }
 
 
-if ( wh_questions[randomQuestion_wh] == 'I think Berth2 is blocked. Where you want me to put this bag?') {
+if ( wh_questions[randomQuestion_wh] == 'I think Berth2 is blocked. Where do you want me to put this bag?') {
 
  
           $("#id_wh").show();
@@ -3185,7 +3278,7 @@ function sawareness_wh(){
  restoreTaskPaneWhenQuestionsClear();
  $("#SA_Berth1, #SA_Berth2").off("click");
   
- setTimeout(function(){   
+ trackTimeout(function(){   
    if (random_video == 0)
     {
     psiTurk.recordTrialData({'phase':'SA_wh_block',  'status':'Berth1 is blocked'});
@@ -3356,7 +3449,7 @@ var n_zero_newgetcode = 0;
 var n_zero_incorrectkeycode = 0;
 
 
-$(document).keypress(function(){
+$(document).on("keypress.game", function(){
 
      $("#anykey").hide()
      
@@ -3517,7 +3610,7 @@ var arraygetcode_one = new Array;
 var newkeycode_one =0;
 var newgetcode_one = 0;
 var incorrect_onekeycode = 0;
-$(document).keypress(function(){
+$(document).on("keypress.game", function(){
 
       $("#anykey").hide()
      var keycode = event.which || event.keyCode;
@@ -3698,7 +3791,7 @@ var newgetcode_two = 0;
 var incorrect_twokeycode = 0;
 
 
-$(document).keypress(function(){
+$(document).on("keypress.game", function(){
 
       $("#anykey").hide()
      var keycode = event.which || event.keyCode;
@@ -3865,10 +3958,10 @@ if (condition==0)
 
 myFunction();
 sawareness();
-setInterval(myFunction,80000);
+trackInterval(myFunction,80000);
 clearTimeout(silentclear); 
 clearTimeout(whclear);
-setInterval(sawareness, 100000);
+trackInterval(sawareness, 100000);
 
 }
 
@@ -3880,10 +3973,10 @@ if (condition==1)
 
 myFunction();
 sawareness();
-setInterval(myFunction,80000);
+trackInterval(myFunction,80000);
 clearTimeout(silentclear); 
 clearTimeout(whclear);
-setInterval(sawareness, 100000);
+trackInterval(sawareness, 100000);
 }
 
 if (condition==2)
@@ -3893,10 +3986,10 @@ if (condition==2)
 
 myFunction();
 sawareness();
-setInterval(myFunction,80000);
+trackInterval(myFunction,80000);
 clearTimeout(whclear);
 clearTimeout(silentclear); 
-setInterval(sawareness, 100000);
+trackInterval(sawareness, 100000);
 
 }
 
@@ -3909,9 +4002,9 @@ if (condition==3)
 whFunction();
 sawareness_wh();
 clearTimeout(myfunctionclear); 
-setInterval(whFunction,80000);
+trackInterval(whFunction,80000);
 clearTimeout(silentclear); 
-setInterval(sawareness_wh, 100000);
+trackInterval(sawareness_wh, 100000);
 
 
 }
@@ -3925,9 +4018,9 @@ if (condition==4)
 whFunction();
 sawareness_wh();
 clearTimeout(myfunctionclear); 
-setInterval(whFunction,80000);
+trackInterval(whFunction,80000);
 clearTimeout(silentclear); 
-setInterval(sawareness_wh, 100000);
+trackInterval(sawareness_wh, 100000);
 
 }
 
@@ -3938,10 +4031,10 @@ if (condition==5)
 
 whFunction();
 sawareness_wh();
-setInterval(whFunction,80000);
+trackInterval(whFunction,80000);
 clearTimeout(silentclear); 
 clearTimeout(myfunctionclear); 
-setInterval(sawareness_wh, 100000);
+trackInterval(sawareness_wh, 100000);
 }
 
 
@@ -3952,10 +4045,10 @@ if (condition==6)
 
 silentFunction();
 sawareness_silent();
-setInterval(silentFunction,80000);
+trackInterval(silentFunction,80000);
 clearTimeout(myfunctionclear); 
 clearTimeout(whclear);
-setInterval(sawareness_silent, 100000);
+trackInterval(sawareness_silent, 100000);
 }
 
 if (condition==7)
@@ -3965,10 +4058,10 @@ if (condition==7)
 
 silentFunction();
 sawareness_silent();
-setInterval(silentFunction,80000);
+trackInterval(silentFunction,80000);
 clearTimeout(myfunctionclear); 
 clearTimeout(whclear);
-setInterval(sawareness_silent, 100000);
+trackInterval(sawareness_silent, 100000);
 }
 
 
@@ -3979,20 +4072,21 @@ if (condition==8)
 
 silentFunction();
 sawareness_silent();
-setInterval(silentFunction,80000);
+trackInterval(silentFunction,80000);
 clearTimeout(myfunctionclear); 
 clearTimeout(whclear);
-setInterval(sawareness_silent, 100000);
+trackInterval(sawareness_silent, 100000);
 }
 
-
-var timeleft = 480;
+//originally 480
+var timeleft = 20;
 
 
   var downloadTimer = setInterval(function(){
   if(timeleft <= 0){
     clearInterval(downloadTimer);
    $("#countdown").html("Game Over");
+   endGameCleanup();
    currentview = new Questionnaire();
 
 

@@ -7,6 +7,7 @@ __pycache__/custom.cpython-38.pyc
 server.log
 commitMSG.txt
 *.log
+.NLTC_Psiturk_Venv/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

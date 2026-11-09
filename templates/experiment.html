@@ -39,43 +39,7 @@
 <div id="presenter_two" class="center-screen" style="font-size: 3vw;"> </div>
 
 
-<!---Natural Language to Command--->
-<div id="nltc-panel" style="position:fixed; left:0; right:0; bottom:0; z-index:1; background:#fff; border-top:1px solid #aaa; padding:8px; text-align:center;">
-  <form id="nltc-form" style="text-align:center; margin:0;">
-    <input type="text" id="nltc-input" placeholder="Type a command for your teammate" autocomplete="off" style="width:60%;">
-    <button type="submit" id="nltc-send">Send</button>
-  </form>
-  <div id="nltc-response" style="text-align:center; min-height:1.5em;"></div>
-</div>
 
-<script>
-  document.getElementById('nltc-form').addEventListener('submit', async function (e) {
-    e.preventDefault();
-    const input = document.getElementById('nltc-input');
-    const out = document.getElementById('nltc-response');
-    const userCommand = input.value.trim();
-    if (!userCommand) return;
-
-    try {
-      const res = await fetch('/natural_lang_to_command', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({"userCommand": userCommand})
-      });
-      if (!res.ok) {
-        out.textContent = 'Server error (' + res.status + ').';
-        return;
-      }
-      const data = await res.json();
-      out.textContent = data.error ? data.error : JSON.stringify(data);
-      input.value = '';
-    } catch (err) {
-      console.error(err);
-      out.textContent = 'Request failed: ' + err.message;
-    }
-  });
-</script>
-<!---NLTC end--->
 
 
 </div>
@@ -83,70 +47,82 @@
 
 <div id="msg2" class="hidemsg">
 
-<video class= "only_block" id="1block" height = "500" width="500">
+<video class= "only_block" id="1block" preload="auto" height = "500" width="500">
         <source src="/static/videos/1block.mp4" type="video/mp4">        
       </video>
 
-<video class = "Berth1_block" id="1block_2drop" height = "500" width="500" >
+<video class = "Berth1_block" id="1block_2drop" preload="auto" height = "500" width="500" >
         <source src="/static/videos/1block_2drop.mp4" type="video/mp4">
         
       </video>
 
+<!-- Berth 3 disabled (numberOfBerths = 2); restore with the Berth 3 removal in task.js
 <video class = "Berth1_block" id="1block_3drop" height = "500" width="500">
         <source src="/static/videos/1block_3drop.mp4" type="video/mp4">
         
       </video>
+-->
 
-<video class= "only_block" id="2block" height = "500" width="500">
+<video class= "only_block" id="2block" preload="auto" height = "500" width="500">
         <source src="/static/videos/2block.mp4" type="video/mp4">
         
       </video>
 
 
-<video class = "Berth2_block" id="2block_1drop" height = "500" width="500">
+<video class = "Berth2_block" id="2block_1drop" preload="auto" height = "500" width="500">
         <source src="/static/videos/2block_1drop.mp4" type="video/mp4">
         
       </video>
 
+<!-- Berth 3 disabled (numberOfBerths = 2); restore with the Berth 3 removal in task.js
 <video class = "Berth2_block" id="2block_3drop" height = "500" width="500">
         <source src="/static/videos/2block_3drop.mp4" type="video/mp4">
         
       </video>
+-->
 
 
+<!-- Berth 3 disabled (numberOfBerths = 2); restore with the Berth 3 removal in task.js
 <video class= "only_block" id="3block" height = "500" width="500" >
         <source src="/static/videos/3block.mp4" type="video/mp4">
         
       </video>
+-->
 
 
+<!-- Berth 3 disabled (numberOfBerths = 2); restore with the Berth 3 removal in task.js
 <video class = "Berth3_block" id="3block_1drop" height = "500" width="500">
         <source src="/static/videos/3block_1drop.mp4" type="video/mp4">
         
       </video>
+-->
 
+<!-- Berth 3 disabled (numberOfBerths = 2); restore with the Berth 3 removal in task.js
 <video class = "Berth3_block" id="3block_2drop" height = "500" width="500">
         <source src="/static/videos/3block_2drop.mp4" type="video/mp4">
   
       </video>
+-->
       
       
-<video class = "Berth1_block" id="bag_berth_1" height = "500" width="500">
+<video class = "Berth1_block" id="bag_berth_1" preload="auto" height = "500" width="500">
         <source src="/static/videos/bag_berth_1.mp4" type="video/mp4">
   
       </video>     
 
 
-<video class = "Berth2_block" id="bag_berth_2" height = "500" width="500">
+<video class = "Berth2_block" id="bag_berth_2" preload="auto" height = "500" width="500">
         <source src="/static/videos/bag_berth_2.mp4" type="video/mp4">
   
       </video>  
       
 
+<!-- Berth 3 disabled (numberOfBerths = 2); restore with the Berth 3 removal in task.js
 <video class = "Berth3_block" id="bag_berth_3" height = "500" width="500">
         <source src="/static/videos/bag_berth_3.mp4" type="video/mp4">
   
-      </video>  
+      </video>
+-->  
 
 
 
@@ -234,9 +210,21 @@ function toggler() {
 
 <div id = "random_wh" > </div>
 
+<div id="wh_textbox" style="display:none;">
+<form id="wh_form" autocomplete="off" style="text-align:center;">
+  <input type="text" id="wh_input" placeholder="Type where the robot should put the bag" style="width:60%;">
+  <button type="submit" id="wh_send">Send</button>
+</form>
+<div id="wh_response" style="font-family:monospace; text-align:center; min-height:1.5em;"></div>
+<div id="wh_error" style="color:red; text-align:center; min-height:1.5em;"></div>
+</div>
+
+<!-- In text-box conditions this stays hidden; the parsed command clicks the buttons -->
+<div id="wh_buttons">
 <button id="Berth1">Berth1</button>
 <button id="Berth2">Berth2</button>
 <button id="Berth3">Berth3</button>
+</div>
 </div>
 
 
