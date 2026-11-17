@@ -691,7 +691,7 @@ function endGameCleanup() {
     gameTimers = [];
     setWorkloadScreenActive(false);
     setSituationAwarenessScreenActive(false);
-    $(document).off("keypress.workloadLock keypress.textboxLock keypress.game");
+    $(document).off("keypress.workloadLock keypress.textboxLock keypress.gameStart keypress.game");
     $("#id_confrmdiv, #id_block, #id_wh, #id_SA, #id_workload").hide();
 }
 
@@ -2523,8 +2523,14 @@ var ne_wh=0;
 var whclear;
 var random_video;   
 
-// Free-text answer for the wh question: the NLTC endpoint converts it to a
-// berth command, which triggers the same handler the berth buttons used to.
+// NLTC variables
+var nltc_questions = ['I think Berth1 is blocked. Where do you want me to put this bag?',
+                      'I think Berth2 is blocked. Where do you want me to put this bag?'];
+var ne_nltc=0;
+var nltcclear;
+
+// The NLTC endpoint converts free text to a berth command and triggers the
+// same handler the berth buttons use.
 $(document).on('submit', '#wh_form', async function (e) {
     e.preventDefault();
     var text = $("#wh_input").val().trim();
@@ -2542,7 +2548,10 @@ $(document).on('submit', '#wh_form', async function (e) {
         //$("#wh_response").text('API response: ' + JSON.stringify(data));//DEBUG
         var match = data && data.command === 'place' && /^berth([123])$/i.exec(String(data.location || ''));
         if (match) {
-            psiTurk.recordTrialData({'phase':'wh_user_text', 'status':text});
+            psiTurk.recordTrialData({
+                'phase': useTextBox ? 'NLTC_user_text' : 'wh_user_text',
+                'status': text
+            });
             $("#wh_input").val('');
             $("#Berth" + match[1]).trigger('click');
         } else {
@@ -2584,9 +2593,6 @@ psiTurk.recordTrialData({
 });
 
 psiTurk.recordTrialData({'phase':'wh_question', 'status':'question' +wh_questions[randomQuestion_wh]});*/
-psiTurk.recordTrialData({'phase':'wh_input_mode', 'status': useTextBox ? 'text' : 'buttons'});
-
-
 if ((wh_questions[randomQuestion_wh] == 'I think Berth1 is blocked. Where do you want me to put this bag?')|| (wh_questions[randomQuestion_wh] == 'I think Berth2 is blocked. Where do you want me to put this bag?') || (wh_questions[randomQuestion_wh] == 'I think Berth3 is blocked. Where you want me to put this bag?') )
 {
 
@@ -2635,7 +2641,7 @@ $("#2block_1drop").hide() ;
 $("#2block_3drop").hide() ;
 $("#1block").hide();
 $("#3block_2drop").hide() ;
-$("#3block_1drop").hide() ;
+$("#3block_1drop'Task'").hide() ;
 $("#bag_berth_1").hide();
 $("#bag_berth_2").hide();
 $("#bag_berth_3").hide();
@@ -3269,10 +3275,390 @@ $("#2block_3drop").hide() ;
  
 }
 
+
+// Natural Language To Command experiment -------------------------------------------------------------------------------------------------------------------------------
+
+function NLTC_experiment(){
+
+$("#Berth1, #Berth2").off("click");
+var randomQuestion_nltc = Math.floor(Math.random() * nltc_questions.length);
+// The question index is the berth the robot claims is blocked, so the video must match it.
+random_video = randomQuestion_nltc;
+psiTurk.recordTrialData({'phase':'NLTC_question', 'status':'question ' + nltc_questions[randomQuestion_nltc]});
+
+if ((nltc_questions[randomQuestion_nltc] == 'I think Berth1 is blocked. Where do you want me to put this bag?')|| (nltc_questions[randomQuestion_nltc] == 'I think Berth2 is blocked. Where do you want me to put this bag?'))
+{
+
+if (random_video == 0) {
+$("#1block").show() ;
+$("#1block").trigger('play'); 
+psiTurk.recordTrialData({'phase':'NLTC_video_shown',  'status':'Berth1 is blocked'}); 
+$("#1block_2drop").hide() ;
+$("#1block_3drop").hide() ;
+$("#2block").hide();
+$("#2block_1drop").hide() ;
+$("#2block_3drop").hide() ;
+$("#3block").hide();
+$("#3block_2drop").hide() ;
+$("#3block_1drop").hide() ;
+$("#bag_berth_1").hide();
+$("#bag_berth_2").hide();
+$("#bag_berth_3").hide();
+}
+
+if (random_video == 1) {
+$("#2block").show() ;
+psiTurk.recordTrialData({'phase':'NLTC_video_shown',  'status':'Berth2 is blocked'}); 
+$("#2block").trigger('play');
+$("#1block_2drop").hide() ;
+$("#1block_3drop").hide() ;
+$("#1block").hide();
+$("#2block_1drop").hide() ;
+$("#2block_3drop").hide() ;
+$("#3block").hide();
+$("#3block_2drop").hide() ;
+$("#3block_1drop").hide() ;
+$("#bag_berth_1").hide();
+$("#bag_berth_2").hide();
+$("#bag_berth_3").hide();
+}
+}
+
+ne_nltc = nltc_questions[randomQuestion_nltc];
+$("#random_wh").html(nltc_questions[randomQuestion_nltc]);
+
+$("#id_wh").hide(); 
+$("#wh_input").val('');
+$("#wh_error").text('');
+$("#wh_response").text('');
+$("#wh_textbox").show();
+$("#wh_buttons").hide();
+
+nltcclear = trackTimeout(function () {
+
+if (nltc_questions[randomQuestion_nltc] == 'I think Berth1 is blocked. Where do you want me to put this bag?') {
+ 
+  $("#id_wh").show();
+  $("#Berth2").show();
+  $("#Berth3").show();
+  $("#Berth1").show();
+  
+ if (random_video == 0) {         
+
+$("#Berth1").click(function() {
+   
+   $("#id_wh").hide();$("#1block").hide();
+   $("#Berth1").hide();
+   $("#Berth2").hide();  
+    $("#Berth3").hide();
+    $("#bag_berth_1").show();
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#bag_berth_1'});
+    psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'invalid action'});          
+    psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward -100'}); 
+    $("#bag_berth_1").trigger('play');
+     $("#1block_2drop").hide(); 
+     $("#1block_3drop").hide();
+     $("#2block").hide();
+     $("#2block_1drop").hide() ;
+     $("#2block_3drop").hide() ;
+     $("#3block").hide();
+     $("#3block_1drop").hide() ;
+     $("#3block_2drop").hide() ;
+     $("#bag_berth_2").hide();
+     $("#bag_berth_3").hide();       
+})
+
+$("#Berth2").click(function() {
+   
+   $("#id_wh").hide();$("#1block").hide();
+   $("#Berth1").hide();
+   $("#Berth2").hide();  
+    $("#Berth3").hide();
+    $("#1block_2drop").show();
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#1block_2drop'}); 
+    psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'valid action'});            
+    psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward +50'}); 
+    $("#1block_2drop").trigger('play');
+     $("#1block_3drop").hide();                 
+       $("#bag_berth_1").hide();
+       $("#2block").hide();
+       $("#2block_1drop").hide() ;
+       $("#2block_3drop").hide() ;
+       $("#3block").hide();
+       $("#bag_berth_2").hide();
+       $("#bag_berth_3").hide();   
+       $("#3block_1drop").hide() ;
+       $("#3block_2drop").hide() ;             
+})
+
+$("#Berth3").click(function() {
+
+   $("#id_wh").hide();$("#1block").hide();
+   $("#Berth1").hide();
+   $("#Berth2").hide();  
+    $("#Berth3").hide();
+    $("#1block_3drop").show(); 
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#1block_3drop'});
+    psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'valid medium'});           
+    psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward +30'}); 
+   $("#1block_3drop").trigger('play');  
+    $("#bag_berth_1").hide();         
+   $("#1block_2drop").hide();
+   $("#2block").hide();
+   $("#2block_1drop").hide() ;
+   $("#2block_3drop").hide() ;
+   $("#3block").hide();
+   $("#bag_berth_2").hide();
+   $("#bag_berth_3").hide();   
+   $("#3block_1drop").hide() ;
+   $("#3block_2drop").hide() ;             
+})
+
+
+}
+
+ if (random_video == 1) {         
+
+ $("#Berth1").click(function() {
+   
+   $("#id_wh").hide();
+   $("#Berth1").hide();$("#2block").hide();
+   $("#Berth2").hide();  
+    $("#Berth3").hide();
+    $("#2block_1drop").show() ;
+    $("#1block").hide();
+    $("#1block_2drop").hide() ;
+    $("#1block_3drop").hide() ;
+    $("#3block").hide();
+    $("#3block_1drop").hide() ;
+    $("#bag_berth_1").hide();
+    $("#bag_berth_3").hide();   
+    $("#3block_2drop").hide() ;  
+    $("#2block_1drop").trigger('play'); 
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#2block_1drop'}); 
+    psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'valid action'});            
+    psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward +50'});   
+    $("#bag_berth_2").hide(); 
+    $("#2block_3drop").hide() ;
+})
+
+$("#Berth2").click(function() {
+   
+   $("#id_wh").hide();
+   $("#Berth1").hide();$("#2block").hide();
+   $("#Berth2").hide();  
+    $("#Berth3").hide();
+    $("#2block_1drop").hide() ;
+    $("#1block").hide();
+    $("#1block_2drop").hide() ;
+    $("#1block_3drop").hide() ;
+    $("#3block").hide();
+    $("#3block_1drop").hide() ;
+    $("#bag_berth_1").hide();
+    $("#bag_berth_3").hide();   
+    $("#3block_2drop").hide() ;  
+    $("#bag_berth_2").show();
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#bag_berth_2'});
+    psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'invalid action'});          
+    psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward -100'});  
+    $("#bag_berth_2").trigger('play');  
+    $("#2block_3drop").hide() ;
+})
+
+$("#Berth3").click(function() {
+
+   $("#id_wh").hide();$("#2block").hide();
+   $("#Berth1").hide();
+   $("#Berth2").hide();  
+    $("#Berth3").hide();
+    $("#1block").hide();
+    $("#1block_2drop").hide() ;
+    $("#1block_3drop").hide() ;
+    $("#2block_1drop").hide() ;
+    $("#2block_3drop").hide() ;       
+    $("#3block_2drop").show() ; 
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#3block_2drop'});
+    psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'valid medium'});   
+    $("#3block_2drop").trigger('play'); 
+    psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward +30'}); 
+})
+ 
+}
+
+}
+
+if (nltc_questions[randomQuestion_nltc] == 'I think Berth2 is blocked. Where do you want me to put this bag?') {
+ 
+  $("#id_wh").show();
+  $("#Berth2").show();
+  $("#Berth3").show();
+  $("#Berth1").show();
+
+if (random_video == 0) {         
+
+$("#Berth1").click(function() {
+   
+   $("#id_wh").hide();$("#1block").hide();
+   $("#Berth1").hide();
+   $("#Berth2").hide();  
+    $("#Berth3").hide();
+    $("#bag_berth_1").show(); 
+    psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward -100'}); 
+    psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'invalid action'});  
+    $("#bag_berth_1").trigger('play'); 
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#bag_berth_1'});    
+     $("#1block_2drop").hide(); 
+     $("#1block_3drop").hide();                 
+     $("#2block").hide();
+     $("#2block_1drop").hide() ;
+     $("#2block_3drop").hide() ;
+     $("#bag_berth_3").hide();
+     $("#bag_berth_2").hide();  
+     $("#3block").hide();
+     $("#3block_1drop").hide() ;
+     $("#3block_2drop").hide() ;           
+})
+
+$("#Berth2").click(function() {
+   
+   $("#id_wh").hide();$("#1block").hide();
+   $("#Berth1").hide();
+   $("#Berth2").hide();  
+    $("#Berth3").hide();
+    $("#1block_2drop").show(); 
+    psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward +50'}); 
+    psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'valid action'});   
+    $("#1block_2drop").trigger('play');
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#1block_2drop'});
+     $("#1block_3drop").hide();                 
+       $("#bag_berth_1").hide();                    
+       $("#2block").hide();
+       $("#2block_1drop").hide() ;
+       $("#bag_berth_3").hide();
+       $("#bag_berth_2").hide(); 
+       $("#2block_3drop").hide() ;
+       $("#3block").hide();
+       $("#3block_1drop").hide() ;
+       $("#3block_2drop").hide() ;              
+})
+
+$("#Berth3").click(function() {
+
+   $("#id_wh").hide();$("#1block").hide();
+   $("#Berth1").hide();
+   $("#Berth2").hide();
+   $("#bag_berth_3").hide();
+   $("#bag_berth_2").hide(); 
+    $("#Berth3").hide();
+    $("#1block_3drop").show(); 
+    psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward +30'}); 
+   $("#1block_3drop").trigger('play');
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#1block_3drop'});
+    psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'valid medium'});  
+    $("#bag_berth_1").hide();         
+   $("#1block_2drop").hide();         
+   $("#2block").hide();
+   $("#2block_1drop").hide() ;
+   $("#2block_3drop").hide() ;
+   $("#3block").hide();
+   $("#bag_berth_2").hide();  
+   $("#3block_1drop").hide() ;
+   $("#3block_2drop").hide() ;            
+})
+
+}
+
+
+ if (random_video == 1) {         
+
+ $("#Berth1").click(function() {
+   
+   $("#id_wh").hide();
+   $("#Berth1").hide();$("#2block").hide();
+   $("#Berth2").hide();  
+    $("#Berth3").hide();
+    $("#1block").hide();
+    $("#1block_2drop").hide() ;
+    $("#1block_3drop").hide() ;
+    $("#3block").hide();
+    $("#3block_1drop").hide() ;
+    $("#3block_2drop").hide() ;  
+    $("#2block_1drop").show() ; 
+    $("#2block_1drop").trigger('play'); 
+    psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward +50'});                  
+    $("#bag_berth_2").hide(); 
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#2block_1drop'});
+    psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'valid action'});  
+    $("#2block_3drop").hide() ;
+    $("#bag_berth_3").hide();
+    $("#bag_berth_1").hide(); 
+})
+
+$("#Berth2").click(function() {
+   
+   $("#id_wh").hide();
+   $("#Berth1").hide();$("#2block").hide();
+   $("#Berth2").hide();  
+    $("#Berth3").hide();
+    $("#1block").hide();
+    $("#1block_2drop").hide() ;
+    $("#bag_berth_3").hide();
+    $("#bag_berth_1").hide(); 
+    $("#1block_3drop").hide() ;
+    $("#3block").hide();
+    $("#3block_1drop").hide() ;
+    $("#3block_2drop").hide() ;  
+    $("#2block_1drop").hide() ;  
+    $("#bag_berth_2").show();
+    psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward -100'});          
+    $("#bag_berth_2").trigger('play'); 
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#bag_berth_2'}); 
+    psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'invalid action'});  
+    $("#2block_3drop").hide() ;
+})
+
+$("#Berth3").click(function() {
+
+   $("#id_wh").hide();
+   $("#Berth1").hide();$("#2block").hide();
+   $("#Berth2").hide();  
+    $("#Berth3").hide();
+    $("#1block").hide();
+    $("#bag_berth_3").hide();
+    $("#bag_berth_1").hide(); 
+    $("#1block_2drop").hide() ;
+    $("#1block_3drop").hide() ;
+    $("#3block").hide();
+    $("#3block_1drop").hide() ;
+    $("#3block_2drop").hide() ;  
+  $("#2block_1drop").hide() ;   
+  $("#bag_berth_2").hide(); 
+  $("#2block_3drop").show() ;
+ $("#2block_3drop").trigger('play');
+ psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward +30'}); 
+ psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'valid medium'});  
+ psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#2block_3drop'}); 
+})
+
+}
+
+}
+
+},25000)
+ 
+}
+
 // SA_wh -------------------------------------------------------------------------------------------------------------------------------
 
 function sawareness_wh(){
+    sawarenessWithPhase('SA_wh');
+}
 
+function sawareness_NLTC(){
+    sawarenessWithPhase('SA_NLTC');
+}
+
+function sawarenessWithPhase(awarenessPhase){
  $("#id_SA, #SA_Berth1, #SA_Berth2").hide();
  setSituationAwarenessScreenActive(false);
  restoreTaskPaneWhenQuestionsClear();
@@ -3281,7 +3667,7 @@ function sawareness_wh(){
  trackTimeout(function(){   
    if (random_video == 0)
     {
-    psiTurk.recordTrialData({'phase':'SA_wh_block',  'status':'Berth1 is blocked'});
+    psiTurk.recordTrialData({'phase':awarenessPhase + '_block',  'status':'Berth1 is blocked'});
     setSituationAwarenessScreenActive(true);
     $("#SA_Berth1").show();
     $("#SA_Berth2").show();
@@ -3296,8 +3682,8 @@ function sawareness_wh(){
     $("#SA_Berth3").hide();
     
     SA_correct +=1;
-//psiTurk.recordTrialData({'phase':'SA_wh', 'status':'SA_correct'+SA_correct});
-psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth1'});
+//psiTurk.recordTrialData({'phase':awarenessPhase, 'status':'SA_correct'+SA_correct});
+psiTurk.recordTrialData({'phase':awarenessPhase,  'status':'SA_Berth1'});
     }); 
     
    $("#SA_Berth2").click(function() {
@@ -3308,8 +3694,8 @@ psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth1'});
     $("#SA_Berth3").hide();
     
     SA_incorrect +=1;
-//psiTurk.recordTrialData({'phase':'SA_wh', 'status':'SA_incorrect'+SA_incorrect});
-psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth2'});
+//psiTurk.recordTrialData({'phase':awarenessPhase, 'status':'SA_incorrect'+SA_incorrect});
+psiTurk.recordTrialData({'phase':awarenessPhase,  'status':'SA_Berth2'});
     });
     
    
@@ -3321,8 +3707,8 @@ psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth2'});
     $("#SA_Berth3").hide();
     
     SA_incorrect +=1;
-//psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth3'});
-psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth3'});
+//psiTurk.recordTrialData({'phase':awarenessPhase,  'status':'SA_Berth3'});
+psiTurk.recordTrialData({'phase':awarenessPhase,  'status':'SA_Berth3'});
     });    
     
     }
@@ -3331,7 +3717,7 @@ psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth3'});
      
     if (random_video == 1)
     {
-    psiTurk.recordTrialData({'phase':'SA_wh_block',  'status':'Berth2 is blocked'});
+    psiTurk.recordTrialData({'phase':awarenessPhase + '_block',  'status':'Berth2 is blocked'});
     setSituationAwarenessScreenActive(true);
     $("#SA_Berth1").show();
     $("#SA_Berth2").show();
@@ -3346,8 +3732,8 @@ psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth3'});
     $("#SA_Berth3").hide();
     
     SA_incorrect +=1;
-//psiTurk.recordTrialData({'phase':'SA_wh', 'status':'SA_incorrect'+SA_incorrect});
-psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth1'});
+//psiTurk.recordTrialData({'phase':awarenessPhase, 'status':'SA_incorrect'+SA_incorrect});
+psiTurk.recordTrialData({'phase':awarenessPhase,  'status':'SA_Berth1'});
     }); 
     
    $("#SA_Berth2").click(function() {
@@ -3358,8 +3744,8 @@ psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth1'});
     $("#SA_Berth3").hide();
     
     SA_correct +=1;
-//psiTurk.recordTrialData({'phase':'SA_wh', 'status':'SA_correct'+SA_correct});
-psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth2'});
+//psiTurk.recordTrialData({'phase':awarenessPhase, 'status':'SA_correct'+SA_correct});
+psiTurk.recordTrialData({'phase':awarenessPhase,  'status':'SA_Berth2'});
     });
     
    
@@ -3371,8 +3757,8 @@ psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth2'});
     $("#SA_Berth3").hide();
     
     SA_incorrect +=1;
-//psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_incorrect'+SA_incorrect});
-psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth3'});
+//psiTurk.recordTrialData({'phase':awarenessPhase,  'status':'SA_incorrect'+SA_incorrect});
+psiTurk.recordTrialData({'phase':awarenessPhase,  'status':'SA_Berth3'});
 
     });
     
@@ -3382,7 +3768,7 @@ psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth3'});
      
      if (random_video == 2)
     {
-    psiTurk.recordTrialData({'phase':'SA_wh_block',  'status':'Berth3 is blocked.'});
+    psiTurk.recordTrialData({'phase':awarenessPhase + '_block',  'status':'Berth3 is blocked.'});
     setSituationAwarenessScreenActive(true);
     $("#SA_Berth1").show();
     $("#SA_Berth2").show();
@@ -3397,8 +3783,8 @@ psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth3'});
     $("#SA_Berth3").hide();
     
     SA_incorrect +=1;
-//psiTurk.recordTrialData({'phase':'SA_wh', 'status':'SA_incorrect'+SA_incorrect});
-psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth1'});
+//psiTurk.recordTrialData({'phase':awarenessPhase, 'status':'SA_incorrect'+SA_incorrect});
+psiTurk.recordTrialData({'phase':awarenessPhase,  'status':'SA_Berth1'});
     }); 
     
    $("#SA_Berth2").click(function() {
@@ -3409,8 +3795,8 @@ psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth1'});
     $("#SA_Berth3").hide();
     
     SA_incorrect +=1;
-//psiTurk.recordTrialData({'phase':'SA_wh', 'status':'SA_incorrect'+SA_incorrect});
-psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth2'});
+//psiTurk.recordTrialData({'phase':awarenessPhase, 'status':'SA_incorrect'+SA_incorrect});
+psiTurk.recordTrialData({'phase':awarenessPhase,  'status':'SA_Berth2'});
 
     });
     
@@ -3423,14 +3809,33 @@ psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth2'});
     $("#SA_Berth3").hide();
     
     SA_correct +=1;
-//psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_correct'+SA_correct});
-psiTurk.recordTrialData({'phase':'SA_wh',  'status':'SA_Berth3'});
+//psiTurk.recordTrialData({'phase':awarenessPhase,  'status':'SA_correct'+SA_correct});
+psiTurk.recordTrialData({'phase':awarenessPhase,  'status':'SA_Berth3'});
     });
     
     }
       }, 45000);
   } 
   
+// The first key press dismisses the start prompt; do not let the game handlers
+// treat that key as a number-memory response. The selected game handler still
+// displays the first number before skipping response processing.
+var startPromptDismissalPending = false;
+$(document).on("keypress.gameStart", function (event) {
+    if (!$("#anykey").is(":visible")) {
+        var keycode = event.which || event.keyCode;
+        if (keycode === 32) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }
+        return;
+    }
+
+    $("#anykey").hide();
+    startPromptDismissalPending = true;
+    event.preventDefault();
+});
+
 if (condition == 0 || condition == 3 || condition == 6 ) {
 
 
@@ -3474,7 +3879,14 @@ var randomColor = hexArray[Math.floor(Math.random() * hexArray.length)];
     
     n_zero_get_code = n_zero_number.charCodeAt(1) 
 
-    console.log(n_zero_get_code);
+     if (startPromptDismissalPending) {
+            startPromptDismissalPending = false;
+            n_zero_arraykeycode.push(keycode);
+            n_zero_arraygetcode.push(n_zero_get_code);
+            return;
+    }
+
+     console.log(n_zero_get_code);
    // console.log(keycode);
     n_zero_arraykeycode.push(keycode)
     n_zero_arraygetcode.push(n_zero_get_code);
@@ -3627,6 +4039,16 @@ var randomColor = hexArray[Math.floor(Math.random() * hexArray.length)];
     
     get_code_one = number_one.charCodeAt(1) 
 
+    if (startPromptDismissalPending) {
+        startPromptDismissalPending = false;
+        arraykeycode_one.push(keycode);
+        arraygetcode_one.push(get_code_one);
+        $("#rand_no_one").html(rand_no_one);
+        $("#rand_no_one").css("color", randomColor);
+        $("#presenter_one").html("Please press enter to see the next number in the sequence");
+        return;
+    }
+
    // console.log(get_code);
    // console.log(keycode);
     arraykeycode_one.push(keycode)
@@ -3640,7 +4062,6 @@ var randomColor = hexArray[Math.floor(Math.random() * hexArray.length)];
  
     $("#presenter_one").html("Please press enter to see the next number in the sequence");
      }
-    
     
 	  
    for (var i =1; i<arraykeycode_one.length;i++)
@@ -3666,6 +4087,10 @@ var randomColor = hexArray[Math.floor(Math.random() * hexArray.length)];
      
      console.log("newkeycode_one"+newkeycode_one);
      console.log("newgetcode_one"+newgetcode_one);
+
+     if (typeof newgetcode_one !== 'number') {
+         return;
+     }
      
      incorrect_onekeycode = newkeycode_one
      
@@ -3808,6 +4233,16 @@ var randomColor = hexArray[Math.floor(Math.random() * hexArray.length)];
     
     get_code_two = number_two.charCodeAt(1) 
 
+    if (startPromptDismissalPending) {
+        startPromptDismissalPending = false;
+        arraykeycode_two.push(keycode);
+        arraygetcode_two.push(get_code_two);
+        $("#rand_no_two").html(rand_no_two);
+        $("#rand_no_two").css("color", randomColor);
+        $("#presenter_two").html("Please press enter to see the next number in the sequence");
+        return;
+    }
+
    // console.log(get_code);
    // console.log(keycode);
     arraykeycode_two.push(keycode)
@@ -3820,7 +4255,6 @@ var randomColor = hexArray[Math.floor(Math.random() * hexArray.length)];
      
     $("#presenter_two").html("Please press enter to see the next number in the sequence");
      }
-    
     
 	  
    for (var i =1; i<arraykeycode_two.length;i++)
@@ -3846,6 +4280,10 @@ var randomColor = hexArray[Math.floor(Math.random() * hexArray.length)];
      
      console.log("newkeycode_two"+newkeycode_two);
      console.log("newgetcode_two"+newgetcode_two);
+
+     if (typeof newgetcode_two !== 'number') {
+         return;
+     }
      
      incorrect_twokeycode = newkeycode_two
      
@@ -3994,7 +4432,7 @@ trackInterval(sawareness, 100000);
 }
 
 
-if (condition==3)
+if (condition==3 && !useTextBox)
 
 
 {
@@ -4010,7 +4448,7 @@ trackInterval(sawareness_wh, 100000);
 }
 
 
-if (condition==4)
+if (condition==4 && !useTextBox)
 
 
 {
@@ -4024,7 +4462,7 @@ trackInterval(sawareness_wh, 100000);
 
 }
 
-if (condition==5)
+if (condition==5 && !useTextBox)
 
 
 {
@@ -4078,8 +4516,52 @@ clearTimeout(whclear);
 trackInterval(sawareness_silent, 100000);
 }
 
+// NLTC_experiment conditions
+if (recordedCondition==9)
+
+
+{
+
+NLTC_experiment();
+sawareness_NLTC();
+clearTimeout(myfunctionclear); 
+trackInterval(NLTC_experiment,80000);
+clearTimeout(silentclear); 
+trackInterval(sawareness_NLTC, 100000);
+
+
+}
+
+
+if (recordedCondition==10)
+
+
+{
+
+NLTC_experiment();
+sawareness_NLTC();
+clearTimeout(myfunctionclear); 
+trackInterval(NLTC_experiment,80000);
+clearTimeout(silentclear); 
+trackInterval(sawareness_NLTC, 100000);
+
+}
+
+if (recordedCondition==11)
+
+
+{
+
+NLTC_experiment();
+sawareness_NLTC();
+trackInterval(NLTC_experiment,80000);
+clearTimeout(silentclear); 
+clearTimeout(myfunctionclear); 
+trackInterval(sawareness_NLTC, 100000);
+}
+
 //originally 480
-var timeleft = 20;
+var timeleft = 60;
 
 
   var downloadTimer = setInterval(function(){
@@ -4113,6 +4595,8 @@ record_responses();
 }
 
 
+var finalCheckQuestionRecorded = false;
+
 var Questionnaire = function() {
 
 	psiTurk.finishInstructions();
@@ -4123,16 +4607,11 @@ var Questionnaire = function() {
 
 	psiTurk.recordTrialData({'phase':'checkquestion', 'status':'submit'});
 
-	var radio_groups = {}
-	$(":radio").each(function(i, val){
-	    radio_groups[this.name] = true;
-	})
-
-	    for(group in radio_groups){
-	        //psiTurk.recordUnstructuredData(group,$(":radio[name='"+group+"']:checked").val());
-		psiTurk.recordUnstructuredData("final_check_question",$(":radio[name='"+group+"']:checked").val());
-		
-	    }
+	var answer = $("input[type=radio][name=check]:checked").val();
+	if (!finalCheckQuestionRecorded && answer !== undefined) {
+	    psiTurk.recordUnstructuredData("final_check_question", answer);
+	    finalCheckQuestionRecorded = true;
+	}
 
     };
 
@@ -4187,7 +4666,7 @@ var FinalQuestion = function() {
 
     record_responses = function() {
 
-      psiTurk.recordTrialData({'phase':'checkquestion', 'status':'submit'});
+      psiTurk.recordTrialData({'phase':'postquestionnaire', 'status':'submit'});
 
       psiTurk.recordUnstructuredData('Open_Response_Robot', document.getElementById("openresponse1").value);
 
@@ -4215,7 +4694,7 @@ var FinalQuestion = function() {
 
     psiTurk.showPage('postquestionaire.html');
     window.scrollTo(0, 0);
-    psiTurk.recordTrialData({'phase':'checkquestion', 'status':'begin'});
+    psiTurk.recordTrialData({'phase':'postquestionnaire', 'status':'begin'});
 
   var r1, r2 = false;
 

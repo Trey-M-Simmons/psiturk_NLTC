@@ -60,13 +60,22 @@ Robot communication style (every 80 seconds)
 Conditions 0, 1, 2 use the yes/no style, run by myFunction. The robot asks something like "I think Berth 1 is blocked. 
     Can I put the bag on Berth 2?" and the participant answers.
 Conditions 3, 4, 5 use the wh style, run by whFunction. The robot asks "I think Berth1 is blocked. Where you want me 
-    to put this bag?" This is the prompt that now has the text box.
+    to put this bag?".
 Conditions 6, 7, 8 use the silent style, run by silentFunction. The robot just states "I think Berth1 is blocked." It
     doesn't ask a question.
 Conditions 9, 10, 11 use natural language to command
 
-# Future Fixes
-Currently the model + program consistently succeed except for the valid prompts asking for the cargo to be placed on the left/right/middle ones
 
-# Important Notes
-Note: As of Oct 28, 2026, this code will actually be a integrated into Psiturk and be an independant repository.
+# NLTC Specific Data logging
+I made a "NLTC" data point/json keys for each of the dataPoint keys
+NLTC_question, what question the robot asked.
+NLTC_user_text, what text the user sent back as a response
+NLTC_put_bag, the berth that the user's text input placed the cargo on 
+user_NLTC, whether the user chose a valid or invalid action
+
+
+Here are some of the rest, these should be self explanatory/mirror directly other experiment data points.
+NLTC_video_shown
+NLTC_reward
+
+NOTE: I changed the key for the post questionnaire to be "postquestionnaire" in order to differentiate between the questionnaire and the robot-check question.
