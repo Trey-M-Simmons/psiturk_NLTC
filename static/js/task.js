@@ -827,7 +827,6 @@ random_video = randomQuestion_silent;
 
 if ((silent_questions[randomQuestion_silent] == 'I think Berth1 is blocked.') ||(silent_questions[randomQuestion_silent] == 'I think Berth2 is blocked.') ||(silent_questions[randomQuestion_silent] == 'I think Berth3 is blocked.'))   {
 
-psiTurk.recordTrialData({'phase':'SA_silent_question', 'status':silent_questions[randomQuestion_silent]}); // wrong perception in silent strategy
 if (random_video == 0) {$("#1block").show() ; // reward assign based on actions 
 $("#1block").trigger('play');
 psiTurk.recordTrialData({'phase':'SA_video', 'status':'random video 0'});
@@ -1331,8 +1330,6 @@ $("#id_truebtn, #id_falsebtn, #id_Berth1, #id_Berth2").off("click");
 
 var randomQuestion = Math.floor(Math.random() * questions.length);
 
-psiTurk.recordTrialData({'phase':'yn_question', 'status':'question'+questions[randomQuestion]});
-
 // The question index is the berth the robot claims is blocked, so the video must match it.
 random_video = randomQuestion;
 //make the robot's assessment correct with 70% probability.
@@ -1349,8 +1346,6 @@ psiTurk.recordTrialData({
     'phase': 'robot_accuracy',
     'status': robotCorrect ? 'correct' : 'incorrect'
 });*/
-
-psiTurk.recordTrialData({'phase':'yn_question', 'status':'question'+questions[randomQuestion]});
 
 if ((questions[randomQuestion] == 'I think Berth 1 is blocked. Can I put the bag on Berth 2?') || (questions[randomQuestion] == 'I think Berth 1 is blocked. Can I put the bag on Berth 3?') ||(questions[randomQuestion] ==  'I think Berth 2 is blocked. Can I put the bag on Berth 1?' )  || (questions[randomQuestion] == 'I think Berth 2 is blocked. Can I put the bag on Berth 3?' ) ||
 (questions[randomQuestion] == 'I think Berth 3 is blocked. Can I put the bag on Berth 1?' )   || (questions[randomQuestion] == 'I think Berth 3 is blocked. Can I put the bag on Berth 2?' ) )   
@@ -1421,6 +1416,7 @@ myfunctionclear=trackTimeout(function () {
 $("#id_confrmdiv").show();
 $("#id_truebtn").show();
 $("#id_falsebtn").show();
+psiTurk.recordTrialData({'phase':'yn_question', 'status':'question'+questions[randomQuestion]});
 
 $("#id_truebtn").click(function() {
     
@@ -2571,7 +2567,6 @@ $("#Berth1, #Berth2").off("click");
 var randomQuestion_wh = Math.floor(Math.random() * wh_questions.length);
 // The question index is the berth the robot claims is blocked, so the video must match it.
 random_video = randomQuestion_wh;
-psiTurk.recordTrialData({'phase':'wh_question', 'status':'question' +wh_questions[randomQuestion_wh]});
 
 /*
 // Make the robot's assessment correct with 70% probability.
@@ -2666,6 +2661,7 @@ if ( wh_questions[randomQuestion_wh] == 'I think Berth1 is blocked. Where do you
 
  
           $("#id_wh").show();
+          psiTurk.recordTrialData({'phase':'wh_question', 'status':'question' +wh_questions[randomQuestion_wh]});
           $("#Berth2").show();
           $("#Berth3").show();
           $("#Berth1").show();
@@ -2875,6 +2871,7 @@ if ( wh_questions[randomQuestion_wh] == 'I think Berth2 is blocked. Where do you
 
  
           $("#id_wh").show();
+          psiTurk.recordTrialData({'phase':'wh_question', 'status':'question' +wh_questions[randomQuestion_wh]});
           $("#Berth2").show();
           $("#Berth3").show();
           $("#Berth1").show();
@@ -3075,6 +3072,7 @@ if ( wh_questions[randomQuestion_wh] == 'I think Berth3 is blocked. Where you wa
 
  
           $("#id_wh").show();
+          psiTurk.recordTrialData({'phase':'wh_question', 'status':'question' +wh_questions[randomQuestion_wh]});
           $("#Berth2").show();
           $("#Berth3").show();
           $("#Berth1").show();
@@ -3284,7 +3282,6 @@ $("#Berth1, #Berth2").off("click");
 var randomQuestion_nltc = Math.floor(Math.random() * nltc_questions.length);
 // The question index is the berth the robot claims is blocked, so the video must match it.
 random_video = randomQuestion_nltc;
-psiTurk.recordTrialData({'phase':'NLTC_question', 'status':'question ' + nltc_questions[randomQuestion_nltc]});
 
 if ((nltc_questions[randomQuestion_nltc] == 'I think Berth1 is blocked. Where do you want me to put this bag?')|| (nltc_questions[randomQuestion_nltc] == 'I think Berth2 is blocked. Where do you want me to put this bag?'))
 {
@@ -3339,6 +3336,7 @@ nltcclear = trackTimeout(function () {
 if (nltc_questions[randomQuestion_nltc] == 'I think Berth1 is blocked. Where do you want me to put this bag?') {
  
   $("#id_wh").show();
+  psiTurk.recordTrialData({'phase':'NLTC_question', 'status':'question ' + nltc_questions[randomQuestion_nltc]});
   $("#Berth2").show();
   $("#Berth3").show();
   $("#Berth1").show();
@@ -3490,6 +3488,7 @@ $("#Berth3").click(function() {
 if (nltc_questions[randomQuestion_nltc] == 'I think Berth2 is blocked. Where do you want me to put this bag?') {
  
   $("#id_wh").show();
+  psiTurk.recordTrialData({'phase':'NLTC_question', 'status':'question ' + nltc_questions[randomQuestion_nltc]});
   $("#Berth2").show();
   $("#Berth3").show();
   $("#Berth1").show();
@@ -3654,6 +3653,7 @@ function sawareness_wh(){
     sawarenessWithPhase('SA_wh');
 }
 
+//logs which berth the users believes is blocked
 function sawareness_NLTC(){
     sawarenessWithPhase('SA_NLTC');
 }
