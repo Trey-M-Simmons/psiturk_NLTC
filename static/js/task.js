@@ -85,7 +85,63 @@ else if (mycondition%9 == 8)
 //psiTurk.recordTrialData({'phase':'condition', 'status':'8'});        
         }
 
+/*******Updated Situational system where we keep track of the time and number of switches between number game and robot*******/
+//these are reset after each question that the robot asks
+var screenSwitchCounter = 0;
+var robotWatchTime = 0;
+//start/end times of when the participant switches to the robot screen, is reset after each switch
+var robotWatchStartTime = null;
+var robotWatchEndTime = null;//technically unnecessary, but kept for clarity
+var robotViewSelected = false;
 
+//call whenenever the screen switches to the robot view
+function trackSwitchToRobot() {
+    screenSwitchCounter += 1;
+    robotViewSelected = true;
+    syncRobotWatchTime();
+}
+
+//call whenever the screen switches away from the robot view
+function trackSwitchFromRobot() {
+    robotViewSelected = false;
+    syncRobotWatchTime();
+}
+
+//keeps track of the time the participant spends watching the robot view
+//call whenever some kind of overlay pops up or disappears (e.g., workload or situational awareness overlays) that could block the robot
+function syncRobotWatchTime() {
+    //checks if the participant is looking at the robot view and not blocked by workload or original situational awareness overlays
+    var canWatchRobot = robotViewSelected &&
+        !$("body").hasClass("workload-active") && !$("body").hasClass("sa-active");
+    //if the participant just swapped to the robot 
+    if (canWatchRobot && robotWatchStartTime === null) {
+        robotWatchStartTime = new Date();
+    //if the participant just swapped back to task
+    } else if (!canWatchRobot && robotWatchStartTime !== null) {
+        robotWatchEndTime = new Date();
+        robotWatchTime += (robotWatchEndTime - robotWatchStartTime) / 1000;
+        robotWatchStartTime = null;
+        robotWatchEndTime = null;
+    }
+}
+
+//log whenever a new question is presented to the participant or on experiment end
+function logSituationalAwarenessData() {
+    //if the next question is asked/experiment ends while the participant looks at the robot
+    if (robotWatchStartTime !== null) {
+        var now = new Date();
+        robotWatchTime += (now - robotWatchStartTime) / 1000;
+        robotWatchStartTime = now;//if the participant is already looking at the robot, start timer and count this as a switch
+        screenSwitchCounter += 1;
+    }
+    psiTurk.recordTrialData({'phase':'situational_awareness', 'screenSwitchCounter': screenSwitchCounter, 'robotWatchTime': robotWatchTime});
+    SA_onNewQuestion();
+}
+
+function SA_onNewQuestion() {
+    screenSwitchCounter = 0;
+    robotWatchTime = 0;
+}
 
 
 var pages = [
@@ -631,6 +687,9 @@ $("#id_confrmdiv, #id_block, #id_wh, #id_SA, #id_workload").hide();
 function setSituationAwarenessScreenActive(isActive) {
     $("body").toggleClass("sa-active", isActive);
     $("#id_SA").toggle(isActive);
+    if (useTextBox) {
+        syncRobotWatchTime();
+    }
 }
 
 // Existing response handlers record rewards and start the appropriate videos.
@@ -669,6 +728,9 @@ function restoreTaskPaneWhenQuestionsClear() {
         return;
     }
 
+    if (useTextBox && robotViewSelected) {
+        trackSwitchFromRobot();
+    }
     $(".hidemsg").hide();
     $("#msg1").show();
     $(".js-button").text("View Teammate");
@@ -689,6 +751,10 @@ function trackTimeout(fn, ms) { var id = setTimeout(fn, ms); gameTimers.push({id
 function endGameCleanup() {
     gameTimers.forEach(function (t) { t.interval ? clearInterval(t.id) : clearTimeout(t.id); });
     gameTimers = [];
+    if (useTextBox) {
+        logSituationalAwarenessData();
+        trackSwitchFromRobot();
+    }
     setWorkloadScreenActive(false);
     setSituationAwarenessScreenActive(false);
     $(document).off("keypress.workloadLock keypress.textboxLock keypress.gameStart keypress.game");
@@ -729,6 +795,9 @@ $(document).on("keypress.textboxLock", function (event) {
 function setWorkloadScreenActive(isActive) {
     workloadPromptActive = isActive;
     $("body").toggleClass("workload-active", isActive);
+    if (useTextBox) {
+        syncRobotWatchTime();
+    }
     $(".js-button").prop("disabled", isActive);
     $("#msg1, #msg2, #experiment-controls")
         .prop("inert", isActive)
@@ -3283,6 +3352,9 @@ var randomQuestion_nltc = Math.floor(Math.random() * nltc_questions.length);
 // The question index is the berth the robot claims is blocked, so the video must match it.
 random_video = randomQuestion_nltc;
 
+//logSituationalAwarenessData();
+//trackSwitchToRobot();
+
 if ((nltc_questions[randomQuestion_nltc] == 'I think Berth1 is blocked. Where do you want me to put this bag?')|| (nltc_questions[randomQuestion_nltc] == 'I think Berth2 is blocked. Where do you want me to put this bag?'))
 {
 
@@ -3333,6 +3405,8 @@ $("#wh_buttons").hide();
 
 nltcclear = trackTimeout(function () {
 
+logSituationalAwarenessData();
+
 if (nltc_questions[randomQuestion_nltc] == 'I think Berth1 is blocked. Where do you want me to put this bag?') {
  
   $("#id_wh").show();
@@ -3344,7 +3418,6 @@ if (nltc_questions[randomQuestion_nltc] == 'I think Berth1 is blocked. Where do 
  if (random_video == 0) {         
 
 $("#Berth1").click(function() {
-   
    $("#id_wh").hide();$("#1block").hide();
    $("#Berth1").hide();
    $("#Berth2").hide();  
@@ -3367,7 +3440,6 @@ $("#Berth1").click(function() {
 })
 
 $("#Berth2").click(function() {
-   
    $("#id_wh").hide();$("#1block").hide();
    $("#Berth1").hide();
    $("#Berth2").hide();  
@@ -3390,7 +3462,6 @@ $("#Berth2").click(function() {
 })
 
 $("#Berth3").click(function() {
-
    $("#id_wh").hide();$("#1block").hide();
    $("#Berth1").hide();
    $("#Berth2").hide();  
@@ -3418,7 +3489,6 @@ $("#Berth3").click(function() {
  if (random_video == 1) {         
 
  $("#Berth1").click(function() {
-   
    $("#id_wh").hide();
    $("#Berth1").hide();$("#2block").hide();
    $("#Berth2").hide();  
@@ -3441,7 +3511,6 @@ $("#Berth3").click(function() {
 })
 
 $("#Berth2").click(function() {
-   
    $("#id_wh").hide();
    $("#Berth1").hide();$("#2block").hide();
    $("#Berth2").hide();  
@@ -3464,7 +3533,6 @@ $("#Berth2").click(function() {
 })
 
 $("#Berth3").click(function() {
-
    $("#id_wh").hide();$("#2block").hide();
    $("#Berth1").hide();
    $("#Berth2").hide();  
@@ -3496,7 +3564,6 @@ if (nltc_questions[randomQuestion_nltc] == 'I think Berth2 is blocked. Where do 
 if (random_video == 0) {         
 
 $("#Berth1").click(function() {
-   
    $("#id_wh").hide();$("#1block").hide();
    $("#Berth1").hide();
    $("#Berth2").hide();  
@@ -3519,7 +3586,6 @@ $("#Berth1").click(function() {
 })
 
 $("#Berth2").click(function() {
-   
    $("#id_wh").hide();$("#1block").hide();
    $("#Berth1").hide();
    $("#Berth2").hide();  
@@ -3542,7 +3608,6 @@ $("#Berth2").click(function() {
 })
 
 $("#Berth3").click(function() {
-
    $("#id_wh").hide();$("#1block").hide();
    $("#Berth1").hide();
    $("#Berth2").hide();
@@ -3571,7 +3636,6 @@ $("#Berth3").click(function() {
  if (random_video == 1) {         
 
  $("#Berth1").click(function() {
-   
    $("#id_wh").hide();
    $("#Berth1").hide();$("#2block").hide();
    $("#Berth2").hide();  
@@ -3594,7 +3658,6 @@ $("#Berth3").click(function() {
 })
 
 $("#Berth2").click(function() {
-   
    $("#id_wh").hide();
    $("#Berth1").hide();$("#2block").hide();
    $("#Berth2").hide();  
@@ -3617,7 +3680,6 @@ $("#Berth2").click(function() {
 })
 
 $("#Berth3").click(function() {
-
    $("#id_wh").hide();
    $("#Berth1").hide();$("#2block").hide();
    $("#Berth2").hide();  
