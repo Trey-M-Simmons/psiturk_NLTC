@@ -85,8 +85,69 @@ else if (mycondition%9 == 8)
 //psiTurk.recordTrialData({'phase':'condition', 'status':'8'});        
         }
 
+/*******Updated Situational system where we keep track of the time and number of switches between number game and robot*******/
+//these are reset after each question that the robot asks
+var screenSwitchCounter = 0;//the amount of times that the participant switches to the robot view
+var robotWatchTime = 0;
+//start/end times of when the participant switches to the robot screen, is reset after each switch
+var robotWatchStartTime = null;
+var robotWatchEndTime = null;//technically unnecessary, but kept for clarity
+var robotViewSelected = false;
 
+//call whenenever the screen switches to the robot view
+function trackSwitchToRobot() {
+    screenSwitchCounter += 1;
+    robotViewSelected = true;
+    syncRobotWatchTime();
+}
 
+//call whenever the screen switches away from the robot view
+function trackSwitchFromRobot() {
+    robotViewSelected = false;
+    syncRobotWatchTime();
+}
+
+//keeps track of the time the participant spends watching the robot view
+//call whenever some kind of overlay pops up or disappears (e.g., workload or situational awareness overlays) that could block the robot
+function syncRobotWatchTime() {
+    //checks if the participant is looking at the robot view and not blocked by workload or original situational awareness overlays
+    var canWatchRobot = robotViewSelected &&
+        !$("body").hasClass("workload-active") && !$("body").hasClass("sa-active");
+    //if the participant just swapped to the robot 
+    if (canWatchRobot && robotWatchStartTime === null) {
+        robotWatchStartTime = new Date();
+    //if the participant just swapped back to task
+    } else if (!canWatchRobot && robotWatchStartTime !== null) {
+        robotWatchEndTime = new Date();
+        robotWatchTime += (robotWatchEndTime - robotWatchStartTime) / 1000;
+        robotWatchStartTime = null;
+        robotWatchEndTime = null;
+    }
+}
+
+//call log whenever a new question is presented to the participant or on experiment end
+function logSituationalAwarenessData() {
+    //if the next question is asked/experiment ends while the participant looks at the robot
+    if (robotWatchStartTime !== null) {
+        var now = new Date();
+        robotWatchTime += (now - robotWatchStartTime) / 1000;
+        psiTurk.recordTrialData({'phase':'situational_awareness', 'screenSwitchCounter': screenSwitchCounter, 'robotWatchTime': robotWatchTime});
+        SA_onNewQuestion();
+        //if the participant is already looking at the robot, start timer for next question and count this as a screen switch
+        screenSwitchCounter = 1;
+        robotWatchStartTime = now;
+        return;
+    }
+    psiTurk.recordTrialData({'phase':'situational_awareness', 'screenSwitchCounter': screenSwitchCounter, 'robotWatchTime': robotWatchTime});
+    SA_onNewQuestion();
+}
+
+function SA_onNewQuestion() {
+    screenSwitchCounter = 0;
+    robotWatchTime = 0;
+}
+
+/*******************************************************SA SECTION END***************************************************************************/
 
 var pages = [
      "consent.html",
@@ -631,6 +692,9 @@ $("#id_confrmdiv, #id_block, #id_wh, #id_SA, #id_workload").hide();
 function setSituationAwarenessScreenActive(isActive) {
     $("body").toggleClass("sa-active", isActive);
     $("#id_SA").toggle(isActive);
+    if (useTextBox) {
+        syncRobotWatchTime();
+    }
 }
 
 // Existing response handlers record rewards and start the appropriate videos.
@@ -669,6 +733,9 @@ function restoreTaskPaneWhenQuestionsClear() {
         return;
     }
 
+    if (useTextBox && robotViewSelected) {
+        trackSwitchFromRobot();
+    }
     $(".hidemsg").hide();
     $("#msg1").show();
     $(".js-button").text("View Teammate");
@@ -689,6 +756,12 @@ function trackTimeout(fn, ms) { var id = setTimeout(fn, ms); gameTimers.push({id
 function endGameCleanup() {
     gameTimers.forEach(function (t) { t.interval ? clearInterval(t.id) : clearTimeout(t.id); });
     gameTimers = [];
+
+    //for NLTC condition, log SA data. rm if statement if implemented for other conditions
+    if (useTextBox) {
+        logSituationalAwarenessData();
+        trackSwitchFromRobot();
+    }
     setWorkloadScreenActive(false);
     setSituationAwarenessScreenActive(false);
     $(document).off("keypress.workloadLock keypress.textboxLock keypress.gameStart keypress.game");
@@ -729,6 +802,9 @@ $(document).on("keypress.textboxLock", function (event) {
 function setWorkloadScreenActive(isActive) {
     workloadPromptActive = isActive;
     $("body").toggleClass("workload-active", isActive);
+    if (useTextBox) {
+        syncRobotWatchTime();
+    }
     $(".js-button").prop("disabled", isActive);
     $("#msg1, #msg2, #experiment-controls")
         .prop("inert", isActive)
@@ -756,7 +832,7 @@ function workload() {
         $("#id_one").trigger("focus");
 
         $("#id_one").click(function () {
-            psiTurk.recordTrialData({'phase': 'Workload', 'status': 'workload_one'});
+            psiTurk.recordTrialData({'phase': 'Workload', 'workload': '1'});
             $("#id_workload").hide();
             setWorkloadScreenActive(false);
             $("#question").hide();
@@ -766,7 +842,7 @@ function workload() {
         });
 
         $("#id_two").click(function () {
-            psiTurk.recordTrialData({'phase': 'Workload', 'status': 'workload_two'});
+            psiTurk.recordTrialData({'phase': 'Workload', 'workload': '2'});
             $("#id_workload").hide();
             setWorkloadScreenActive(false);
             $("#question").hide();
@@ -776,7 +852,7 @@ function workload() {
         });
 
         $("#id_three").click(function () {
-            psiTurk.recordTrialData({'phase': 'Workload', 'status': 'workload_three'});
+            psiTurk.recordTrialData({'phase': 'Workload', 'workload': '3'});
             $("#id_workload").hide();
             setWorkloadScreenActive(false);
             $("#question").hide();
@@ -895,7 +971,7 @@ $("#1block").hide() ; // reward assign based on actions
 
 
 $("#1block_2drop").show(); // robot action 
-$("#1block_2drop").trigger('play'); psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#1block_2drop'});
+$("#1block_2drop").trigger('play'); psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'});
 $("#2block").hide();
 $("#1block").hide();
 $("#2block_1drop").hide() ;
@@ -914,7 +990,7 @@ psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +50'});
 
  if (random_video == 1) {         
 
-$("#2block_1drop").show();  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#2block_1drop'});
+$("#2block_1drop").show();  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 1'});
 $("#2block_1drop").trigger('play');
 $("#2block").hide();
 $("#1block").hide();
@@ -931,7 +1007,7 @@ $("#bag_berth_3").hide();$("#2block_3drop").hide() ; $("#bag_berth_2").hide();ps
 
  if   (random_video == 2) { // action taken by the robot
  
-$("#3block_1drop").show();  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#3block_1drop'}); 
+$("#3block_1drop").show();  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 1'});
 $("#3block_1drop").trigger('play');
 $("#2block").hide();
 $("#1block").hide();
@@ -950,23 +1026,23 @@ psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward -100'});
 // tune reward based on user click here robot is silent so no user intervention--- 
  
 /*  if (random_video_berth1 ==0) { $("#1block_3drop").hide() ; $("#bag_berth_1").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward +50'}); //correct reward high
- psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#1block_2drop'}); }
+ psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'}); }
   if (random_video_berth1 ==1) { $("#1block_2drop").hide() ; $("#bag_berth_1").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward +30'}); //correct reward medium
- psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#1block_3drop'}); }
+ psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 3'}); }
   if (random_video_berth1 ==2) { $("#1block_3drop").hide() ; $("#1block_2drop").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward -100'}); //incorrect reward large negative
  psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#bag_berth_1'}); } 
  
  if (random_video_berth2 ==0) { $("#2block_3drop").hide() ; $("#bag_berth_2").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward 50'}); //correct reward high
-psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#2block_1drop'}); }
+psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 1'}); }
 if (random_video_berth2 ==1) { $("#2block_1drop").hide() ; $("#bag_berth_2").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward +30'}); //correct reward medium
-psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#2block_3drop'});}
+psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 3'});}
 if (random_video_berth2 ==2) { $("#2block_1drop").hide() ; $("#2block_3drop").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward -100'});//correct reward large negative
 psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#bag_berth_2'});}
  
   if (random_video_berth3 ==0) { $("#3block_2drop").hide() ; $("#bag_berth_3").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward +50'}); //correct reward high
- psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#3block_1drop'}); }
+ psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 1'}); }
   if (random_video_berth3 ==1) { $("#3block_1drop").hide() ; $("#bag_berth_3").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward +30'}); //correct reward medium
- psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#3block_2drop'}); }
+ psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 2'}); }
   if (random_video_berth3 ==2) { $("#3block_1drop").hide() ; $("#3block_2drop").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward -100'}); //correct reward large negative
   psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#bag_berth_3'});}  */
 
@@ -978,7 +1054,7 @@ if ( silent_questions[randomQuestion_silent] == 'I think Berth2 is blocked.') {
  if (random_video == 0) {         
 
 $("#1block_2drop").show(); // robot action 
-$("#1block_2drop").trigger('play'); psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#1block_2drop'});
+$("#1block_2drop").trigger('play'); psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'});
 $("#2block").hide();
 $("#1block").hide();
 $("#2block_1drop").hide() ;
@@ -995,7 +1071,7 @@ psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward -100'});
 
  if (random_video == 1) {         
 
-$("#2block_1drop").show();  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#2block_1drop'});
+$("#2block_1drop").show();  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 1'});
 $("#2block_1drop").trigger('play');
 $("#2block").hide();
 $("#1block").hide();
@@ -1012,7 +1088,7 @@ $("#bag_berth_3").hide();$("#2block_3drop").hide() ; $("#bag_berth_2").hide();ps
 
  if   (random_video == 2) {  
  
-$("#3block_1drop").show();  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#3block_1drop'}); 
+$("#3block_1drop").show();  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 1'});
 $("#3block_1drop").trigger('play');
 $("#2block").hide();
 $("#1block").hide();
@@ -1028,25 +1104,25 @@ psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward -100'});
  }
  
 /*  if (random_video_berth1 ==0) { $("#1block_3drop").hide() ; $("#bag_berth_1").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward +50'}); //correct reward high
- psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#1block_2drop'}); }
+ psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'}); }
   if (random_video_berth1 ==1) { $("#1block_2drop").hide() ; $("#bag_berth_1").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward +30'}); //correct reward medium
- psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#1block_3drop'}); }
+ psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 3'}); }
   if (random_video_berth1 ==2) { $("#1block_3drop").hide() ; $("#1block_2drop").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward -100'}); //incorrect reward large negative
  psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#bag_berth_1'}); }  
  
  
 if (random_video_berth2 ==0) { $("#2block_3drop").hide() ; $("#bag_berth_2").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward 50'}); //correct reward high
-psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#2block_1drop'}); }
+psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 1'}); }
 if (random_video_berth2 ==1) { $("#2block_1drop").hide() ; $("#bag_berth_2").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward +30'}); //correct reward medium
-psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#2block_3drop'});}
+psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 3'});}
 if (random_video_berth2 ==2) { $("#2block_1drop").hide() ; $("#2block_3drop").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward -100'});//correct reward large negative
 psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#bag_berth_2'});}
 
  
   if (random_video_berth3 ==0) { $("#3block_2drop").hide() ; $("#bag_berth_3").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward +50'}); //correct reward high
- psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#3block_1drop'}); }
+ psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 1'}); }
   if (random_video_berth3 ==1) { $("#3block_1drop").hide() ; $("#bag_berth_3").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward +30'}); //correct reward medium
- psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#3block_2drop'}); }
+ psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 2'}); }
   if (random_video_berth3 ==2) { $("#3block_1drop").hide() ; $("#3block_2drop").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward -100'}); //correct reward large negative
   psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#bag_berth_3'});}  */
  
@@ -1060,7 +1136,7 @@ if ( silent_questions[randomQuestion_silent] == 'I think Berth3 is blocked.') {
  if (random_video == 0) {         
 
 $("#1block_2drop").show(); // robot action 
-$("#1block_2drop").trigger('play'); psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#1block_2drop'});
+$("#1block_2drop").trigger('play'); psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'});
 $("#2block").hide();
 $("#1block").hide();
 $("#2block_1drop").hide() ;
@@ -1078,7 +1154,7 @@ psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward -100'});
 
  if (random_video == 1) {         
 
-$("#2block_1drop").show();  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#2block_1drop'});
+$("#2block_1drop").show();  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 1'});
 $("#2block_1drop").trigger('play');
 $("#2block").hide();
 $("#1block").hide();
@@ -1095,7 +1171,7 @@ $("#bag_berth_3").hide();$("#2block_3drop").hide() ; $("#bag_berth_2").hide();ps
 
  if   (random_video == 2) {   
  
-$("#3block_1drop").show();  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#3block_1drop'}); 
+$("#3block_1drop").show();  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 1'});
 $("#3block_1drop").trigger('play');
 $("#2block").hide();
 $("#1block").hide();
@@ -1110,17 +1186,17 @@ psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +50'});
  }
  
 /*if (random_video_berth1 ==0) { $("#1block_3drop").hide() ; $("#bag_berth_1").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward +50'}); //correct reward high
- psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#1block_2drop'}); }
+ psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'}); }
   if (random_video_berth1 ==1) { $("#1block_2drop").hide() ; $("#bag_berth_1").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward +30'}); //correct reward medium
- psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#1block_3drop'}); }
+ psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 3'}); }
   if (random_video_berth1 ==2) { $("#1block_3drop").hide() ; $("#1block_2drop").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward -100'}); //incorrect reward large negative
  psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#bag_berth_1'}); }  
  
  
 if (random_video_berth2 ==0) { $("#2block_3drop").hide() ; $("#bag_berth_2").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward 50'}); //correct reward high
-psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#2block_1drop'}); }
+psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 1'}); }
 if (random_video_berth2 ==1) { $("#2block_1drop").hide() ; $("#bag_berth_2").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward +30'}); //correct reward medium
-psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#2block_3drop'});}
+psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 3'});}
 if (random_video_berth2 ==2) { $("#2block_1drop").hide() ; $("#2block_3drop").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward -100'});//correct reward large negative
 psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#bag_berth_2'});}
  
@@ -1128,9 +1204,9 @@ psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#bag_berth_2'});}
  
  
   if (random_video_berth3 ==0) { $("#3block_2drop").hide() ; $("#bag_berth_3").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward +50'}); //correct reward high
- psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#3block_1drop'}); }
+ psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 1'}); }
   if (random_video_berth3 ==1) { $("#3block_1drop").hide() ; $("#bag_berth_3").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward +30'}); //correct reward medium
- psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#3block_2drop'}); }
+ psiTurk.recordTrialData({'phase':'Silent_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 2'}); }
   if (random_video_berth3 ==2) { $("#3block_1drop").hide() ; $("#3block_2drop").hide(); psiTurk.recordTrialData({'phase':'SA_silent_reward', 'status':'Reward -100'}); //correct reward large negative
   psiTurk.recordTrialData({'phase':'Silent_put_bag', 'status':'#bag_berth_3'});} */
 }
@@ -1146,8 +1222,6 @@ var SA_question = ['Which berth is blocked?'];
 // Silent SA ----------------------------------------------------------------
 
 function sawareness_silent()
-
-
 {
  $("#id_SA, #SA_Berth1, #SA_Berth2").hide();
  setSituationAwarenessScreenActive(false);
@@ -1436,7 +1510,7 @@ if (random_video == 0)
 
 {
 $("#1block_2drop").show(); // robot action 
-$("#1block_2drop").trigger('play'); psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#1block_2drop'});
+$("#1block_2drop").trigger('play'); psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'});
 $("#2block").hide();
 $("#1block").hide();
 $("#2block_1drop").hide() ;
@@ -1456,9 +1530,9 @@ psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward -100'});
 }
   
 //  if (random_video_berth1 ==0) { $("#1block_3drop").hide() ; $("#bag_berth_1").hide(); psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +50'}); //correct reward high
-// psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#1block_2drop'}); }
+// psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'}); }
 //  if (random_video_berth1 ==1) { $("#1block_2drop").hide() ; $("#bag_berth_1").hide(); psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +30'}); //correct reward medium
- // psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#1block_3drop'}); }
+ // psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 3'}); }
  // if (random_video_berth1 ==2) { $("#1block_3drop").hide() ; $("#1block_2drop").hide(); psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward -100'}); //correct reward large negative
  // psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#bag_berth_1'}); }
 
@@ -1471,7 +1545,7 @@ if ( questions[randomQuestion] == 'I think Berth 1 is blocked. Can I put the bag
 if (random_video == 0)
 
 {
- $("#1block_3drop").show() ;  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#1block_3drop'});
+ $("#1block_3drop").show() ;  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 3'});
 $("#1block_3drop").trigger('play');
 $("#2block").hide();
 $("#1block").hide();
@@ -1489,9 +1563,9 @@ psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward -100'});
 }
   
 //  if (random_video_berth1 ==0) { $("#1block_3drop").hide() ; $("#bag_berth_1").hide(); psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +30'}); //correct reward medium
-//   psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#1block_2drop'}); }
+//   psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'}); }
  // if (random_video_berth1 ==1) { $("#1block_2drop").hide() ; $("#bag_berth_1").hide(); psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +50'});//correct reward high
- //   psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#1block_3drop'}); }
+ //   psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 3'}); }
  // if (random_video_berth1 ==2) { $("#1block_3drop").hide() ; $("#1block_2drop").hide(); psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward -100'});//correct reward large negative
   //  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#bag_berth_1'}); }
 
@@ -1505,7 +1579,7 @@ if ( questions[randomQuestion] == 'I think Berth 2 is blocked. Can I put the bag
 if (random_video == 1)
 
 {
-$("#2block_1drop").show();  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#2block_1drop'});
+$("#2block_1drop").show();  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 1', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 1'});
 $("#2block_1drop").trigger('play');
 $("#2block").hide();
 $("#1block").hide();
@@ -1540,7 +1614,7 @@ if ( questions[randomQuestion] == 'I think Berth 2 is blocked. Can I put the bag
 if (random_video == 1)
 
 {
-$("#2block_3drop").show(); psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#2block_3drop'});
+$("#2block_3drop").show(); psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 3', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 3'});
 $("#2block_3drop").trigger('play');
 $("#2block").hide();
 $("#1block").hide();
@@ -1576,7 +1650,7 @@ if ( questions[randomQuestion] == 'I think Berth 3 is blocked. Can I put the bag
 if (random_video == 2)
 
 {
-$("#3block_1drop").show();  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#3block_1drop'}); 
+$("#3block_1drop").show();  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 1'});
 $("#3block_1drop").trigger('play');
 $("#2block").hide();
 $("#1block").hide();
@@ -1595,9 +1669,9 @@ if ((random_video == 0) ||(random_video == 1)) {console.log("wrong");psiTurk.rec
 }
   
  // if (random_video_berth3 ==0) { $("#3block_2drop").hide() ; $("#bag_berth_3").hide(); psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +50'}); //correct reward high
-//  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#3block_1drop'});  }
+//  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 1'});  }
  // if (random_video_berth3 ==1) { $("#3block_1drop").hide() ; $("#bag_berth_3").hide(); psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +30'}); //correct reward medium
-//  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#3block_2drop'});}
+//  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 2'});}
 //  if (random_video_berth3 ==2) { $("#3block_1drop").hide() ; $("#3block_2drop").hide(); psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward -100'});//correct reward large negative
 //  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#bag_berth_3'});}
 
@@ -1612,7 +1686,7 @@ if ( questions[randomQuestion] == 'I think Berth 3 is blocked. Can I put the bag
 if (random_video == 2)
 
 {
-$("#3block_2drop").show(); psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#3block_2drop'});
+$("#3block_2drop").show(); psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 2'});
 $("#3block_2drop").trigger('play');
 $("#2block").hide();
 $("#1block").hide();
@@ -1631,9 +1705,9 @@ psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward -100'});
 }
   
 //  if (random_video_berth3 ==0) { $("#3block_2drop").hide() ; $("#bag_berth_3").hide(); psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +30'}); //correct reward medium
-//  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#3block_1drop'}); }
+//  psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 1'}); }
  // if (random_video_berth3 ==1) { $("#3block_1drop").hide() ; $("#bag_berth_3").hide(); psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +50'}); //correct reward high
-//   psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#3block_2drop'});}
+//   psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 2'});}
 //  if (random_video_berth3 ==2) { $("#3block_1drop").hide() ; $("#3block_2drop").hide(); psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward -100'}); //correct reward large negative
 // psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#bag_berth_3'});  }
 
@@ -1687,7 +1761,7 @@ $("#3block_2drop").hide() ;
                 })
     
         $("#id_Berth2").click(function() {
-                           psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#1block_2drop'}); // user correct
+                           psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'}); // user correct
                                           psiTurk.recordTrialData({'phase':'user', 'status':'valid'});
                $("#id_block").hide();
                $("#id_Berth1").hide();
@@ -1707,7 +1781,7 @@ $("#3block_2drop").hide() ;
     
     
         $("#id_Berth3").click(function() {
-       psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#1block_3drop'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});
+       psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 3'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});
        $("#id_block").hide();
        $("#id_Berth1").hide();$("#1block").hide();
        $("#id_Berth2").hide();  
@@ -1768,7 +1842,7 @@ $("#2block_3drop").hide() ;$("#bag_berth_2").hide(); $("#bag_berth_3").hide();
 $("#3block").hide();
 $("#3block_1drop").hide() ;
 $("#3block_2drop").hide() ;
-                 psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#1block_2drop'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});
+                 psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});
                 psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +30'}); //medium postive reward    
 
                  $("#1block_3drop").hide();                 
@@ -1788,7 +1862,7 @@ $("#2block_3drop").hide() ;$("#bag_berth_2").hide(); $("#bag_berth_3").hide();
 $("#3block").hide();
 $("#3block_1drop").hide() ;
 $("#3block_2drop").hide() ;
-        psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#1block_3drop'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid action'});
+        psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 3'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid action'});
         psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +50'}); //high positive reward          
 
         $("#bag_berth_1").hide();         
@@ -1841,7 +1915,7 @@ $("#2block_3drop").hide() ;
 $("#3block").hide();
 $("#3block_1drop").hide() ;
 $("#3block_2drop").hide() ;
-                 psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#1block_2drop'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid action'});
+                 psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid action'});
                 psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +50'}); //large postive reward    
 
                  $("#1block_3drop").hide();                 
@@ -1861,7 +1935,7 @@ $("#3block").hide();
 $("#3block_1drop").hide() ;$("#bag_berth_2").hide(); $("#bag_berth_3").hide();
 $("#3block_2drop").hide() ;
         $("#1block_3drop").show(); 
-        psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#1block_3drop'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});
+        psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 3'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});
         psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +30'}); //medium positive reward          
        $("#1block_3drop").trigger('play');  
         $("#bag_berth_1").hide();         
@@ -1901,7 +1975,7 @@ $("#3block_2drop").hide() ;
    
                 $("#2block_1drop").show() ; 
                 $("#2block_1drop").trigger('play');
-                psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#2block_1drop'});               psiTurk.recordTrialData({'phase':'user', 'status':'valid action'});
+                psiTurk.recordTrialData({'phase':'yes_no_put_bag','blocked_berth':'Berth 2', 'cargo_drop':'Berth 1'});               psiTurk.recordTrialData({'phase':'user', 'status':'valid action'});
                  psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +50'});                    // high positive reward       
                 $("#bag_berth_2").hide(); $("#bag_berth_1").hide(); $("#bag_berth_3").hide();
                 $("#2block_3drop").hide() ;
@@ -1944,7 +2018,7 @@ $("#3block_2drop").hide() ;
           $("#2block_3drop").show() ;
          $("#2block_3drop").trigger('play'); psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});
          psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +30'});   // medium positive reward  
-        psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#2block_3drop'});       
+        psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 3'});
         })
         
 
@@ -1972,7 +2046,7 @@ $("#3block").hide();
 $("#3block_1drop").hide() ;
 $("#3block_2drop").hide() ; 
                 $("#2block_1drop").show() ; $("#2block_1drop").trigger('play'); 
-                psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#2block_1drop'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});     
+                psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 1'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});
                 psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +30'}); // medium positive reward       
                 $("#bag_berth_2").hide(); 
                 $("#2block_3drop").hide() ;
@@ -2014,7 +2088,7 @@ $("#3block_2drop").hide() ;
           $("#2block_3drop").show() ;
          $("#2block_3drop").trigger('play'); 
          psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +50'});   // high positive reward   
-        psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#2block_3drop'});                   psiTurk.recordTrialData({'phase':'user', 'status':'valid action'});                  
+        psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 3'});                   psiTurk.recordTrialData({'phase':'user', 'status':'valid action'});
         })
         
        
@@ -2044,7 +2118,7 @@ $("#1block_3drop").hide() ;
 $("#3block").hide();
 $("#3block_1drop").hide() ;
 $("#3block_2drop").hide() ; 
-                psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#2block_1drop'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid action'});     
+                psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 1'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid action'});
                 psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +50'}); // medium positive reward       
                 $("#bag_berth_2").hide(); 
                 $("#2block_3drop").hide() ;
@@ -2088,7 +2162,7 @@ $("#3block_2drop").hide() ;
           $("#2block_3drop").show() ;
          $("#2block_3drop").trigger('play'); 
          psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +30'});   // medium positive reward   
-        psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#2block_3drop'});                   psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});                  
+        psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 3'});                   psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});
         })
         
        
@@ -2125,7 +2199,7 @@ $("#1block_2drop").hide() ;
 $("#1block_3drop").hide() ;
 $("#2block_1drop").hide() ;
 $("#2block_3drop").hide() ;  
-                       psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#3block_1drop'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid action'});                     
+                       psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 1'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid action'});
                  psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +50'});   // high positive reward       
                 $("#bag_berth_3").hide(); 
                 $("#3block_2drop").hide() ;$("#bag_berth_1").hide(); $("#bag_berth_2").hide();
@@ -2165,7 +2239,7 @@ $("#2block_1drop").hide() ;
 $("#2block_3drop").hide() ;   $("#bag_berth_1").hide(); $("#bag_berth_2").hide();
           $("#bag_berth_3").hide(); 
           $("#3block_2drop").show() ;$("#3block_2drop").trigger('play'); 
-          psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#3block_2drop'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});           
+          psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 2'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});
           psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +30'});  // medium positive reward        
         })
         
@@ -2196,7 +2270,7 @@ $("#2block_1drop").hide() ;
 $("#2block_3drop").hide() ;  
                 $("#3block_1drop").show() ; 
                 $("#3block_1drop").trigger('play'); 
-                 psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#3block_1drop'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});         
+                 psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 1'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});
                 psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +30'}); // medium positive reward       
                 $("#bag_berth_3").hide(); 
                 $("#3block_2drop").hide() ;
@@ -2237,7 +2311,7 @@ $("#2block_1drop").hide() ;
 $("#2block_3drop").hide() ;  
           $("#3block_2drop").show() ;
          $("#3block_2drop").trigger('play');
-         psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#3block_2drop'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid action'});          
+         psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 2'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid action'});
          psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +50'}); // high positive reward        
         })
         
@@ -2270,7 +2344,7 @@ $("#1block_3drop").hide() ;
 $("#2block_1drop").hide() ;
 $("#2block_3drop").hide() ;  
 
-                 psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#3block_1drop'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid action'});         
+                 psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 1'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid action'});
                 psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +50'}); // high positive reward       
                 $("#bag_berth_3").hide(); 
                                  $("#3block_2drop").hide() ;
@@ -2313,7 +2387,7 @@ $("#2block_3drop").hide() ;
           $("#bag_berth_3").hide(); 
           $("#3block_2drop").show() ;
          $("#3block_2drop").trigger('play');
-         psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'status':'#3block_2drop'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});          
+         psiTurk.recordTrialData({'phase':'yes_no_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 2'}); psiTurk.recordTrialData({'phase':'user', 'status':'valid medium'});
          psiTurk.recordTrialData({'phase':'Reward_yes_no', 'status':'Reward +30'}); // medium positive reward        
         })
         
@@ -2696,7 +2770,7 @@ $("#3block_2drop").hide() ;  $("#bag_berth_2").hide();  $("#bag_berth_3").hide()
                $("#Berth2").hide();  
                 $("#Berth3").hide();
                 $("#1block_2drop").show();
-                psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#1block_2drop'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});            
+                psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});
                  psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +50'}); //high postive reward    
                 $("#1block_2drop").trigger('play');
                  $("#1block_3drop").hide();                 
@@ -2716,7 +2790,7 @@ $("#3block_2drop").hide() ;
        $("#Berth2").hide();  
         $("#Berth3").hide();
         $("#1block_3drop").show(); 
-        psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#1block_3drop'});  psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});           
+        psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 3'});  psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});
         psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +30'}); //medium positive reward          
        $("#1block_3drop").trigger('play');  
         $("#bag_berth_1").hide();         
@@ -2747,7 +2821,7 @@ $("#3block").hide();
 $("#3block_1drop").hide() ;$("#bag_berth_1").hide();  $("#bag_berth_3").hide();   
 $("#3block_2drop").hide() ;  
                 $("#2block_1drop").trigger('play'); 
-                 psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#2block_1drop'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});            
+                 psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 1'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});
                 psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +50'});   // high positive reward       
                 $("#bag_berth_2").hide(); 
                 $("#2block_3drop").hide() ;
@@ -2790,7 +2864,7 @@ $("#3block_2drop").hide() ;
           $("#bag_berth_2").hide(); 
           $("#2block_3drop").show() ;
          $("#2block_3drop").trigger('play');
-          psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#2block_3drop'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});            
+          psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 3'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});
           psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +30'});  // medium positive reward        
         })
         
@@ -2809,7 +2883,7 @@ $("#3block_2drop").hide() ;
                 $("#Berth3").hide();
                 $("#3block_1drop").show() ; 
                 $("#3block_1drop").trigger('play');  
-                psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#3block_1drop'});  psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});               
+                psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 1'});  psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});
                 psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +50'});                   // high positive reward       
                 $("#bag_berth_3").hide(); 
                 $("#1block").hide(); $("#bag_berth_1").hide();  $("#bag_berth_2").hide();   
@@ -2856,7 +2930,7 @@ $("#1block_2drop").hide() ;
 $("#1block_3drop").hide() ;
 $("#2block_1drop").hide() ;
 $("#2block_3drop").hide() ;       
-          psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#3block_2drop'});  psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});   
+          psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 2'});  psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});
          $("#3block_2drop").trigger('play'); psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +30'}); // medium positive reward        
         })
         
@@ -2907,7 +2981,7 @@ $("#3block_2drop").hide() ;
                $("#Berth2").hide();  
                 $("#Berth3").hide();
                 $("#1block_2drop").show(); psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +50'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});   
-                $("#1block_2drop").trigger('play');psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#1block_2drop'});
+                $("#1block_2drop").trigger('play');psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'});
                  $("#1block_3drop").hide();                 
                    $("#bag_berth_1").hide();                    
 $("#2block").hide();
@@ -2926,7 +3000,7 @@ $("#3block_2drop").hide() ;
        $("#Berth2").hide();  $("#bag_berth_3").hide();  $("#bag_berth_2").hide(); 
         $("#Berth3").hide();
         $("#1block_3drop").show(); psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +30'}); //medium positive reward          
-       $("#1block_3drop").trigger('play');  psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#1block_3drop'});psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});  
+       $("#1block_3drop").trigger('play');  psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 3'});psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});
         $("#bag_berth_1").hide();         
        $("#1block_2drop").hide();         
 $("#2block").hide();
@@ -2956,7 +3030,7 @@ $("#3block_1drop").hide() ;
 $("#3block_2drop").hide() ;  
                 $("#2block_1drop").show() ; 
                 $("#2block_1drop").trigger('play'); psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +50'});                  // high positive reward       
-                $("#bag_berth_2").hide(); psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#2block_1drop'});psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});  
+                $("#bag_berth_2").hide(); psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 1'});psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});
                 $("#2block_3drop").hide() ;$("#bag_berth_3").hide();  $("#bag_berth_1").hide(); 
                 })
     
@@ -2995,7 +3069,7 @@ $("#3block_2drop").hide() ;
           $("#bag_berth_2").hide(); 
           $("#2block_3drop").show() ;
          $("#2block_3drop").trigger('play');  psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +30'});  psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});  
-         psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#2block_3drop'}); 
+         psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 3'});
          // medium positive reward        
         })
         
@@ -3014,7 +3088,7 @@ $("#3block_2drop").hide() ;
                 $("#Berth3").hide();$("#3block").hide();
                 $("#3block_1drop").show() ; 
                 $("#3block_1drop").trigger('play');    psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +50'});       // high positive reward       
-                $("#bag_berth_3").hide();      psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#3block_1drop'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});  
+                $("#bag_berth_3").hide();      psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 1'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});
                $("#3block_2drop").hide() ; 
                 $("#1block").hide();
 $("#2block").hide();
@@ -3053,7 +3127,7 @@ $("#2block_3drop").hide() ;
           $("#bag_berth_3").hide(); 
           $("#3block_2drop").show() ;
          $("#3block_2drop").trigger('play'); psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +30'});
-        psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#3block_2drop'});  psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});  
+        psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 2'});  psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});
             // medium positive reward   
             $("#1block").hide();
 $("#2block").hide();
@@ -3107,7 +3181,7 @@ $("#3block_2drop").hide() ;
                $("#Berth2").hide();  
                 $("#Berth3").hide();
                 $("#1block_2drop").show(); psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +50'}); //high postive reward    
-                $("#1block_2drop").trigger('play');psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#1block_2drop'});  psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});  
+                $("#1block_2drop").trigger('play');psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'});  psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});
                  $("#1block_3drop").hide();                 
                    $("#bag_berth_1").hide(); $("#bag_berth_2").hide();  $("#bag_berth_3").hide(); 
                    $("#2block").hide();
@@ -3126,7 +3200,7 @@ $("#3block_2drop").hide() ;
        $("#Berth2").hide();  
         $("#Berth3").hide(); $("#bag_berth_2").hide();  $("#bag_berth_3").hide(); 
         $("#1block_3drop").show(); psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +30'}); //medium positive reward          
-       $("#1block_3drop").trigger('play'); psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#1block_3drop'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});  
+       $("#1block_3drop").trigger('play'); psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 3'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});
         $("#bag_berth_1").hide();         
        $("#1block_2drop").hide(); 
        $("#2block").hide();
@@ -3151,7 +3225,7 @@ $("#3block_2drop").hide() ;
                 $("#Berth3").hide();
                 $("#2block_1drop").show() ; 
                 $("#2block_1drop").trigger('play');   psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +50'});                  // high positive reward       
-                $("#bag_berth_2").hide(); psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#2block_1drop'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});  
+                $("#bag_berth_2").hide(); psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 1'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});
                 $("#2block_3drop").hide() ;
                 $("#1block").hide(); 
 $("#1block_2drop").hide() ; $("#bag_berth_1").hide();  $("#bag_berth_3").hide(); 
@@ -3191,7 +3265,7 @@ $("#3block_2drop").hide() ;
           $("#bag_berth_2").hide(); 
           $("#2block_3drop").show() ;
          $("#2block_3drop").trigger('play');  
-         psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#2block_3drop'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});  
+         psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 3'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});
           psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +30'}); // medium positive reward  
           $("#1block").hide();
 $("#1block_2drop").hide() ;
@@ -3216,7 +3290,7 @@ $("#3block_2drop").hide() ;
                 $("#Berth3").hide();
                 $("#3block_1drop").show() ; 
                 $("#3block_1drop").trigger('play');   psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +50'});                  // high positive reward       
-                $("#bag_berth_3").hide(); psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#3block_1drop'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});  
+                $("#bag_berth_3").hide(); psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 1'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid action'});
                 $("#1block").hide();
 $("#2block").hide();$("#3block_2drop").hide() ; $("#bag_berth_1").hide();  $("#bag_berth_2").hide(); 
 $("#1block_2drop").hide() ;
@@ -3254,7 +3328,7 @@ $("#2block_3drop").hide() ;
           $("#bag_berth_3").hide(); $("#bag_berth_1").hide();  $("#bag_berth_2").hide(); 
           $("#3block_2drop").show() ;
          $("#3block_2drop").trigger('play');   psiTurk.recordTrialData({'phase':'Reward_wh', 'status':'Reward +30'}); 
-          psiTurk.recordTrialData({'phase':'wh_put_bag', 'status':'#3block_2drop'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});  
+          psiTurk.recordTrialData({'phase':'wh_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 2'}); psiTurk.recordTrialData({'phase':'user_wh', 'status':'valid medium'});
           $("#1block").hide();
 $("#2block").hide();
 $("#1block_2drop").hide() ;
@@ -3282,6 +3356,9 @@ $("#Berth1, #Berth2").off("click");
 var randomQuestion_nltc = Math.floor(Math.random() * nltc_questions.length);
 // The question index is the berth the robot claims is blocked, so the video must match it.
 random_video = randomQuestion_nltc;
+
+//logSituationalAwarenessData();
+//trackSwitchToRobot();
 
 if ((nltc_questions[randomQuestion_nltc] == 'I think Berth1 is blocked. Where do you want me to put this bag?')|| (nltc_questions[randomQuestion_nltc] == 'I think Berth2 is blocked. Where do you want me to put this bag?'))
 {
@@ -3333,6 +3410,8 @@ $("#wh_buttons").hide();
 
 nltcclear = trackTimeout(function () {
 
+logSituationalAwarenessData();
+
 if (nltc_questions[randomQuestion_nltc] == 'I think Berth1 is blocked. Where do you want me to put this bag?') {
  
   $("#id_wh").show();
@@ -3344,7 +3423,6 @@ if (nltc_questions[randomQuestion_nltc] == 'I think Berth1 is blocked. Where do 
  if (random_video == 0) {         
 
 $("#Berth1").click(function() {
-   
    $("#id_wh").hide();$("#1block").hide();
    $("#Berth1").hide();
    $("#Berth2").hide();  
@@ -3367,13 +3445,12 @@ $("#Berth1").click(function() {
 })
 
 $("#Berth2").click(function() {
-   
    $("#id_wh").hide();$("#1block").hide();
    $("#Berth1").hide();
    $("#Berth2").hide();  
     $("#Berth3").hide();
     $("#1block_2drop").show();
-    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#1block_2drop'}); 
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'});
     psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'valid action'});            
     psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward +50'}); 
     $("#1block_2drop").trigger('play');
@@ -3390,13 +3467,12 @@ $("#Berth2").click(function() {
 })
 
 $("#Berth3").click(function() {
-
    $("#id_wh").hide();$("#1block").hide();
    $("#Berth1").hide();
    $("#Berth2").hide();  
     $("#Berth3").hide();
     $("#1block_3drop").show(); 
-    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#1block_3drop'});
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 3'});
     psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'valid medium'});           
     psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward +30'}); 
    $("#1block_3drop").trigger('play');  
@@ -3418,7 +3494,6 @@ $("#Berth3").click(function() {
  if (random_video == 1) {         
 
  $("#Berth1").click(function() {
-   
    $("#id_wh").hide();
    $("#Berth1").hide();$("#2block").hide();
    $("#Berth2").hide();  
@@ -3433,7 +3508,7 @@ $("#Berth3").click(function() {
     $("#bag_berth_3").hide();   
     $("#3block_2drop").hide() ;  
     $("#2block_1drop").trigger('play'); 
-    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#2block_1drop'}); 
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 1'});
     psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'valid action'});            
     psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward +50'});   
     $("#bag_berth_2").hide(); 
@@ -3441,7 +3516,6 @@ $("#Berth3").click(function() {
 })
 
 $("#Berth2").click(function() {
-   
    $("#id_wh").hide();
    $("#Berth1").hide();$("#2block").hide();
    $("#Berth2").hide();  
@@ -3464,7 +3538,6 @@ $("#Berth2").click(function() {
 })
 
 $("#Berth3").click(function() {
-
    $("#id_wh").hide();$("#2block").hide();
    $("#Berth1").hide();
    $("#Berth2").hide();  
@@ -3475,7 +3548,7 @@ $("#Berth3").click(function() {
     $("#2block_1drop").hide() ;
     $("#2block_3drop").hide() ;       
     $("#3block_2drop").show() ; 
-    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#3block_2drop'});
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'blocked_berth':'Berth 3', 'cargo_drop':'Berth 2'});
     psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'valid medium'});   
     $("#3block_2drop").trigger('play'); 
     psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward +30'}); 
@@ -3496,7 +3569,6 @@ if (nltc_questions[randomQuestion_nltc] == 'I think Berth2 is blocked. Where do 
 if (random_video == 0) {         
 
 $("#Berth1").click(function() {
-   
    $("#id_wh").hide();$("#1block").hide();
    $("#Berth1").hide();
    $("#Berth2").hide();  
@@ -3519,7 +3591,6 @@ $("#Berth1").click(function() {
 })
 
 $("#Berth2").click(function() {
-   
    $("#id_wh").hide();$("#1block").hide();
    $("#Berth1").hide();
    $("#Berth2").hide();  
@@ -3528,7 +3599,7 @@ $("#Berth2").click(function() {
     psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward +50'}); 
     psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'valid action'});   
     $("#1block_2drop").trigger('play');
-    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#1block_2drop'});
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 2'});
      $("#1block_3drop").hide();                 
        $("#bag_berth_1").hide();                    
        $("#2block").hide();
@@ -3542,7 +3613,6 @@ $("#Berth2").click(function() {
 })
 
 $("#Berth3").click(function() {
-
    $("#id_wh").hide();$("#1block").hide();
    $("#Berth1").hide();
    $("#Berth2").hide();
@@ -3552,7 +3622,7 @@ $("#Berth3").click(function() {
     $("#1block_3drop").show(); 
     psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward +30'}); 
    $("#1block_3drop").trigger('play');
-    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#1block_3drop'});
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'blocked_berth':'Berth 1', 'cargo_drop':'Berth 3'});
     psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'valid medium'});  
     $("#bag_berth_1").hide();         
    $("#1block_2drop").hide();         
@@ -3571,7 +3641,6 @@ $("#Berth3").click(function() {
  if (random_video == 1) {         
 
  $("#Berth1").click(function() {
-   
    $("#id_wh").hide();
    $("#Berth1").hide();$("#2block").hide();
    $("#Berth2").hide();  
@@ -3586,7 +3655,7 @@ $("#Berth3").click(function() {
     $("#2block_1drop").trigger('play'); 
     psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward +50'});                  
     $("#bag_berth_2").hide(); 
-    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#2block_1drop'});
+    psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 1'});
     psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'valid action'});  
     $("#2block_3drop").hide() ;
     $("#bag_berth_3").hide();
@@ -3594,7 +3663,6 @@ $("#Berth3").click(function() {
 })
 
 $("#Berth2").click(function() {
-   
    $("#id_wh").hide();
    $("#Berth1").hide();$("#2block").hide();
    $("#Berth2").hide();  
@@ -3617,7 +3685,6 @@ $("#Berth2").click(function() {
 })
 
 $("#Berth3").click(function() {
-
    $("#id_wh").hide();
    $("#Berth1").hide();$("#2block").hide();
    $("#Berth2").hide();  
@@ -3636,7 +3703,7 @@ $("#Berth3").click(function() {
  $("#2block_3drop").trigger('play');
  psiTurk.recordTrialData({'phase':'Reward_NLTC', 'status':'Reward +30'}); 
  psiTurk.recordTrialData({'phase':'user_NLTC', 'status':'valid medium'});  
- psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'status':'#2block_3drop'}); 
+ psiTurk.recordTrialData({'phase':'NLTC_put_bag', 'blocked_berth':'Berth 2', 'cargo_drop':'Berth 3'});
 })
 
 }
@@ -4395,11 +4462,11 @@ if (condition==0)
 {
 
 myFunction();
-sawareness();
+//sawareness();
 trackInterval(myFunction,80000);
 clearTimeout(silentclear); 
 clearTimeout(whclear);
-trackInterval(sawareness, 100000);
+//trackInterval(sawareness, 100000); //traditional situational awareness tracking disabled
 
 }
 
@@ -4410,11 +4477,11 @@ if (condition==1)
 {
 
 myFunction();
-sawareness();
+//sawareness();
 trackInterval(myFunction,80000);
 clearTimeout(silentclear); 
 clearTimeout(whclear);
-trackInterval(sawareness, 100000);
+//trackInterval(sawareness, 100000);
 }
 
 if (condition==2)
@@ -4423,11 +4490,11 @@ if (condition==2)
 {
 
 myFunction();
-sawareness();
+//sawareness();
 trackInterval(myFunction,80000);
 clearTimeout(whclear);
 clearTimeout(silentclear); 
-trackInterval(sawareness, 100000);
+//trackInterval(sawareness, 100000);
 
 }
 
@@ -4438,11 +4505,11 @@ if (condition==3 && !useTextBox)
 {
 
 whFunction();
-sawareness_wh();
+//sawareness_wh();
 clearTimeout(myfunctionclear); 
 trackInterval(whFunction,80000);
 clearTimeout(silentclear); 
-trackInterval(sawareness_wh, 100000);
+//trackInterval(sawareness_wh, 100000);
 
 
 }
@@ -4458,7 +4525,7 @@ sawareness_wh();
 clearTimeout(myfunctionclear); 
 trackInterval(whFunction,80000);
 clearTimeout(silentclear); 
-trackInterval(sawareness_wh, 100000);
+//trackInterval(sawareness_wh, 100000);
 
 }
 
@@ -4468,11 +4535,11 @@ if (condition==5 && !useTextBox)
 {
 
 whFunction();
-sawareness_wh();
+//sawareness_wh();
 trackInterval(whFunction,80000);
 clearTimeout(silentclear); 
 clearTimeout(myfunctionclear); 
-trackInterval(sawareness_wh, 100000);
+//trackInterval(sawareness_wh, 100000);
 }
 
 
@@ -4480,7 +4547,7 @@ if (condition==6)
 
 
 {
-
+//NOTE for silent condition, track situational awareness for silent condition
 silentFunction();
 sawareness_silent();
 trackInterval(silentFunction,80000);
@@ -4513,7 +4580,7 @@ sawareness_silent();
 trackInterval(silentFunction,80000);
 clearTimeout(myfunctionclear); 
 clearTimeout(whclear);
-trackInterval(sawareness_silent, 100000);
+//trackInterval(sawareness_silent, 100000);
 }
 
 // NLTC_experiment conditions
@@ -4523,11 +4590,11 @@ if (recordedCondition==9)
 {
 
 NLTC_experiment();
-sawareness_NLTC();
+//sawareness_NLTC();
 clearTimeout(myfunctionclear); 
 trackInterval(NLTC_experiment,80000);
 clearTimeout(silentclear); 
-trackInterval(sawareness_NLTC, 100000);
+//trackInterval(sawareness_NLTC, 100000);
 
 
 }
@@ -4539,11 +4606,11 @@ if (recordedCondition==10)
 {
 
 NLTC_experiment();
-sawareness_NLTC();
+//sawareness_NLTC();
 clearTimeout(myfunctionclear); 
 trackInterval(NLTC_experiment,80000);
 clearTimeout(silentclear); 
-trackInterval(sawareness_NLTC, 100000);
+//trackInterval(sawareness_NLTC, 100000);
 
 }
 
@@ -4553,11 +4620,11 @@ if (recordedCondition==11)
 {
 
 NLTC_experiment();
-sawareness_NLTC();
+//sawareness_NLTC();
 trackInterval(NLTC_experiment,80000);
 clearTimeout(silentclear); 
 clearTimeout(myfunctionclear); 
-trackInterval(sawareness_NLTC, 100000);
+//trackInterval(sawareness_NLTC, 100000);
 }
 
 //originally 480

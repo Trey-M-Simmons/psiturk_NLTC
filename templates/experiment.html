@@ -148,7 +148,14 @@ var numMessages = $('.hidemsg').length;
 $('.hidemsg').hide();
 toggler();
 button.addEventListener('click', toggler);
-function toggler() {
+function toggler(event) {
+    if (event && useTextBox) {
+        if (index === 2) {
+            trackSwitchToRobot();
+        } else {
+            trackSwitchFromRobot();
+        }
+    }
     $('.hidemsg').hide();   
     $('#msg' + index).show();
 
@@ -241,7 +248,6 @@ function toggler() {
         </div>
     </div>
 </div>
-
 
 
 
