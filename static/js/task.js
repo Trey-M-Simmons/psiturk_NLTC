@@ -87,7 +87,7 @@ else if (mycondition%9 == 8)
 
 /*******Updated Situational system where we keep track of the time and number of switches between number game and robot*******/
 //these are reset after each question that the robot asks
-var screenSwitchCounter = 0;
+var screenSwitchCounter = 0;//the amount of times that the participant switches to the robot view
 var robotWatchTime = 0;
 //start/end times of when the participant switches to the robot screen, is reset after each switch
 var robotWatchStartTime = null;
@@ -125,14 +125,18 @@ function syncRobotWatchTime() {
     }
 }
 
-//log whenever a new question is presented to the participant or on experiment end
+//call log whenever a new question is presented to the participant or on experiment end
 function logSituationalAwarenessData() {
     //if the next question is asked/experiment ends while the participant looks at the robot
     if (robotWatchStartTime !== null) {
         var now = new Date();
         robotWatchTime += (now - robotWatchStartTime) / 1000;
-        robotWatchStartTime = now;//if the participant is already looking at the robot, start timer and count this as a switch
-        screenSwitchCounter += 1;
+        psiTurk.recordTrialData({'phase':'situational_awareness', 'screenSwitchCounter': screenSwitchCounter, 'robotWatchTime': robotWatchTime});
+        SA_onNewQuestion();
+        //if the participant is already looking at the robot, start timer for next question and count this as a screen switch
+        screenSwitchCounter = 1;
+        robotWatchStartTime = now;
+        return;
     }
     psiTurk.recordTrialData({'phase':'situational_awareness', 'screenSwitchCounter': screenSwitchCounter, 'robotWatchTime': robotWatchTime});
     SA_onNewQuestion();
@@ -143,6 +147,7 @@ function SA_onNewQuestion() {
     robotWatchTime = 0;
 }
 
+/*******************************************************SA SECTION END***************************************************************************/
 
 var pages = [
      "consent.html",
@@ -751,6 +756,8 @@ function trackTimeout(fn, ms) { var id = setTimeout(fn, ms); gameTimers.push({id
 function endGameCleanup() {
     gameTimers.forEach(function (t) { t.interval ? clearInterval(t.id) : clearTimeout(t.id); });
     gameTimers = [];
+
+    //for NLTC condition, log SA data. rm if statement if implemented for other conditions
     if (useTextBox) {
         logSituationalAwarenessData();
         trackSwitchFromRobot();
@@ -825,7 +832,7 @@ function workload() {
         $("#id_one").trigger("focus");
 
         $("#id_one").click(function () {
-            psiTurk.recordTrialData({'phase': 'Workload', 'status': 'workload_one'});
+            psiTurk.recordTrialData({'phase': 'Workload', 'workload': '1'});
             $("#id_workload").hide();
             setWorkloadScreenActive(false);
             $("#question").hide();
@@ -835,7 +842,7 @@ function workload() {
         });
 
         $("#id_two").click(function () {
-            psiTurk.recordTrialData({'phase': 'Workload', 'status': 'workload_two'});
+            psiTurk.recordTrialData({'phase': 'Workload', 'workload': '2'});
             $("#id_workload").hide();
             setWorkloadScreenActive(false);
             $("#question").hide();
@@ -845,7 +852,7 @@ function workload() {
         });
 
         $("#id_three").click(function () {
-            psiTurk.recordTrialData({'phase': 'Workload', 'status': 'workload_three'});
+            psiTurk.recordTrialData({'phase': 'Workload', 'workload': '3'});
             $("#id_workload").hide();
             setWorkloadScreenActive(false);
             $("#question").hide();
@@ -1215,8 +1222,6 @@ var SA_question = ['Which berth is blocked?'];
 // Silent SA ----------------------------------------------------------------
 
 function sawareness_silent()
-
-
 {
  $("#id_SA, #SA_Berth1, #SA_Berth2").hide();
  setSituationAwarenessScreenActive(false);
@@ -4457,11 +4462,11 @@ if (condition==0)
 {
 
 myFunction();
-sawareness();
+//sawareness();
 trackInterval(myFunction,80000);
 clearTimeout(silentclear); 
 clearTimeout(whclear);
-trackInterval(sawareness, 100000);
+//trackInterval(sawareness, 100000); //traditional situational awareness tracking disabled
 
 }
 
@@ -4472,11 +4477,11 @@ if (condition==1)
 {
 
 myFunction();
-sawareness();
+//sawareness();
 trackInterval(myFunction,80000);
 clearTimeout(silentclear); 
 clearTimeout(whclear);
-trackInterval(sawareness, 100000);
+//trackInterval(sawareness, 100000);
 }
 
 if (condition==2)
@@ -4485,11 +4490,11 @@ if (condition==2)
 {
 
 myFunction();
-sawareness();
+//sawareness();
 trackInterval(myFunction,80000);
 clearTimeout(whclear);
 clearTimeout(silentclear); 
-trackInterval(sawareness, 100000);
+//trackInterval(sawareness, 100000);
 
 }
 
@@ -4500,11 +4505,11 @@ if (condition==3 && !useTextBox)
 {
 
 whFunction();
-sawareness_wh();
+//sawareness_wh();
 clearTimeout(myfunctionclear); 
 trackInterval(whFunction,80000);
 clearTimeout(silentclear); 
-trackInterval(sawareness_wh, 100000);
+//trackInterval(sawareness_wh, 100000);
 
 
 }
@@ -4520,7 +4525,7 @@ sawareness_wh();
 clearTimeout(myfunctionclear); 
 trackInterval(whFunction,80000);
 clearTimeout(silentclear); 
-trackInterval(sawareness_wh, 100000);
+//trackInterval(sawareness_wh, 100000);
 
 }
 
@@ -4530,11 +4535,11 @@ if (condition==5 && !useTextBox)
 {
 
 whFunction();
-sawareness_wh();
+//sawareness_wh();
 trackInterval(whFunction,80000);
 clearTimeout(silentclear); 
 clearTimeout(myfunctionclear); 
-trackInterval(sawareness_wh, 100000);
+//trackInterval(sawareness_wh, 100000);
 }
 
 
@@ -4542,7 +4547,7 @@ if (condition==6)
 
 
 {
-
+//NOTE for silent condition, track situational awareness for silent condition
 silentFunction();
 sawareness_silent();
 trackInterval(silentFunction,80000);
@@ -4575,7 +4580,7 @@ sawareness_silent();
 trackInterval(silentFunction,80000);
 clearTimeout(myfunctionclear); 
 clearTimeout(whclear);
-trackInterval(sawareness_silent, 100000);
+//trackInterval(sawareness_silent, 100000);
 }
 
 // NLTC_experiment conditions
@@ -4585,11 +4590,11 @@ if (recordedCondition==9)
 {
 
 NLTC_experiment();
-sawareness_NLTC();
+//sawareness_NLTC();
 clearTimeout(myfunctionclear); 
 trackInterval(NLTC_experiment,80000);
 clearTimeout(silentclear); 
-trackInterval(sawareness_NLTC, 100000);
+//trackInterval(sawareness_NLTC, 100000);
 
 
 }
@@ -4601,11 +4606,11 @@ if (recordedCondition==10)
 {
 
 NLTC_experiment();
-sawareness_NLTC();
+//sawareness_NLTC();
 clearTimeout(myfunctionclear); 
 trackInterval(NLTC_experiment,80000);
 clearTimeout(silentclear); 
-trackInterval(sawareness_NLTC, 100000);
+//trackInterval(sawareness_NLTC, 100000);
 
 }
 
@@ -4615,11 +4620,11 @@ if (recordedCondition==11)
 {
 
 NLTC_experiment();
-sawareness_NLTC();
+//sawareness_NLTC();
 trackInterval(NLTC_experiment,80000);
 clearTimeout(silentclear); 
 clearTimeout(myfunctionclear); 
-trackInterval(sawareness_NLTC, 100000);
+//trackInterval(sawareness_NLTC, 100000);
 }
 
 //originally 480
